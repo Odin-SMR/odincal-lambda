@@ -11,9 +11,14 @@ attrs==21.4.0
     #   -r requirements.txt
     #   pytest
 backports.functools-lru-cache==1.6.4
+    # via wcwidth
+boto3==1.17.112
+    # via -r requirements.txt
+botocore==1.20.112
     # via
     #   -r requirements.txt
-    #   wcwidth
+    #   boto3
+    #   s3transfer
 click==7.1.2
     # via pip-tools
 configparser==4.0.2
@@ -36,6 +41,10 @@ funcsigs==1.0.2
     # via
     #   mockito
     #   pytest
+futures==3.4.0
+    # via
+    #   -r requirements.txt
+    #   s3transfer
 importlib-metadata==2.1.3
     # via
     #   -r requirements.txt
@@ -46,13 +55,17 @@ importlib-metadata==2.1.3
     #   virtualenv
 importlib-resources==3.3.1
     # via virtualenv
+jmespath==0.10.0
+    # via
+    #   -r requirements.txt
+    #   boto3
+    #   botocore
 mockito==1.4.0
     # via -r requirements-dev.in
 more-itertools==5.0.0
     # via pytest
 numpy==1.15.4
-    # via
-    #   -r requirements.txt
+    # via -r requirements.txt
 packaging==20.9
     # via
     #   pytest
@@ -83,11 +96,17 @@ pygresql==5.2.4
 pyinotify==0.9.6
     # via -r requirements.txt
 pyparsing==2.4.7
-    # via
-    #   -r requirements.txt
-    #   packaging
+    # via packaging
 pytest==4.6.11
     # via -r requirements-dev.in
+python-dateutil==2.8.2
+    # via
+    #   -r requirements.txt
+    #   botocore
+s3transfer==0.4.2
+    # via
+    #   -r requirements.txt
+    #   boto3
 scandir==1.10.0
     # via
     #   -r requirements.txt
@@ -97,7 +116,6 @@ singledispatch==3.7.0
 six==1.16.0
     # via
     #   -r requirements.txt
-    #   cycler
     #   more-itertools
     #   pathlib2
     #   pytest
@@ -115,6 +133,10 @@ typing==3.10.0.0
     #   -r requirements.txt
     #   importlib-resources
     #   pathlib2
+urllib3==1.26.16
+    # via
+    #   -r requirements.txt
+    #   botocore
 virtualenv==20.15.1
     # via tox
 wcwidth==0.2.6
@@ -127,4 +149,3 @@ zipp==1.2.0
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip
-# setuptools
