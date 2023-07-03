@@ -1,0 +1,10 @@
+data
+**/Matlab
+**/.git
+**/.tox
+**/utils
+**/util
+**/scripts
+**/tests
+**/docs
+

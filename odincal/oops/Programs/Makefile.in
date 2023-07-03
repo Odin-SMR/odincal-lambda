@@ -1,0 +1,179 @@
+#
+# Makefile for ODIN software package:
+#
+# Michael Olberg
+# Onsala Space Observatory, S-43992 Onsala, Sweden
+# April 1998
+#
+
+BINDIR = ../bin
+
+# FITSINCLDIR  = ../FITS
+# FITSLIBDIR   = ../FITS
+# FITSLIB      = $(FITSLIBDIR)/libcfitsio.a 
+# FITSLIB      = 
+
+# HDFINCLDIR   = ../HDF/include
+# HDFLIBDIR    = ../HDF/lib
+# HDFLIB       = -L$(HDFLIBDIR)  -ldf -ljpeg -lz
+# HDFLIB       = 
+
+ODININC      = ../Library
+ODINLIB      = ../Library/libodin.a
+
+PGSQLDIR     = /usr/local/pgsql
+PGSQLINC     = $(PGSQLDIR)/include
+PGSQLLIB     = -L$(PGSQLDIR)/lib -lpq
+
+DRPDIR       = ../../DRP
+DRPLIB       = $(DRPDIR)/libdrp.a
+
+SHELL = /bin/sh
+RANLIB=@RANLIB@
+CC=@CC@
+CFLAGS=@CFLAGS@ -I$(ODININC)
+LDFLAGS = $(CFLAGS)
+DEFS = @DEFS@
+LIBS = @LIBS@
+INSTALL=@INSTALL@
+TAR=@TAR@
+GZIP=@GZIP@
+
+ALL = ac acdump aos aosdump level0 merge mirror shk shkdump \
+      rfits wfits rhdf whdf wmlab
+
+all: $(ALL)
+
+ac: ac.o options.o $(ODINLIB)
+	$(CC) -g -o ac ac.o options.o $(ODINLIB) -lm
+
+acdump: acdump.o options.o $(ODINLIB)
+	$(CC) -g -o acdump acdump.o options.o $(ODINLIB) -lm
+
+acsalign: acsalign.o options.o $(ODINLIB)
+	$(CC) -g -o acsalign acsalign.o options.o $(ODINLIB) -lm
+
+aos: aos.o options.o $(ODINLIB)
+	$(CC) -g -o aos aos.o options.o $(ODINLIB) -lm
+
+aosdump: aosdump.o options.o $(ODINLIB)
+	$(CC) -g -o aosdump aosdump.o options.o $(ODINLIB) -lm
+
+bintest: bintest.o odinfits.o 
+	$(CC) -g -o bintest bintest.o odinfits.o -lcfitsio -lm
+
+fba: fba.o options.o $(ODINLIB)
+	$(CC) -g -o fba fba.o options.o $(ODINLIB) -lm
+
+level0: level0.o osu.o options.o $(ODINLIB)
+	$(CC) -g -o level0 level0.o osu.o options.o $(ODINLIB) -lm
+
+merge: merge.o options.o $(ODINLIB)
+	$(CC) -g -o merge merge.o options.o $(ODINLIB) -lm
+
+mirror: mirror.o options.o $(ODINLIB)
+	$(CC) -g -o mirror mirror.o options.o $(ODINLIB) -lm
+
+odin2fits: odin2fits.o options.o $(ODINLIB)
+	$(CC) -g -o odin2fits odin2fits.o options.o $(ODINLIB) \
+	-lcfitsio -lm $(LIBS)
+
+shk: shk.o options.o $(ODINLIB)
+	$(CC) -g -o shk shk.o options.o $(ODINLIB) -lm
+
+shkdump: shkdump.o options.o $(ODINLIB)
+	$(CC) -g -o shkdump shkdump.o options.o $(ODINLIB) -lm
+
+shkgrp: shkgrp.o options.o $(ODINLIB)
+	$(CC) -g -o shkgrp shkgrp.o options.o $(ODINLIB) -lm
+
+rfits: rfits.o options.o odinfits.o $(ODINLIB)
+	$(CC) -g -o rfits rfits.o odinfits.o options.o \
+	$(ODINLIB) -lcfitsio -lm $(LIBS)
+
+wfits: wfits.o options.o odinfits.o $(ODINLIB)
+	$(CC) -g -o wfits wfits.o odinfits.o options.o \
+	$(ODINLIB) -lcfitsio -lm $(LIBS)
+
+rhdf: rhdf.o options.o odinhdf.o $(ODINLIB)
+	$(CC) -g -o rhdf rhdf.o odinhdf.o options.o \
+	$(ODINLIB) -ldf -lm
+
+whdf: whdf.o options.o odinhdf.o $(ODINLIB)
+	$(CC) -g -o whdf whdf.o odinhdf.o options.o \
+	$(ODINLIB) -ldf -lm
+
+wmlab: wmlab.o options.o $(ODINLIB)
+	$(CC) -g -o wmlab wmlab.o options.o \
+	$(ODINLIB) -lm
+
+attitude.o: attitude.c attitude.h
+
+ac.o: ac.c
+
+acdump.o: acdump.c
+
+acsalign.o: acsalign.c
+
+aos.o: aos.c
+
+bintest.o: bintest.c
+	$(CC) $(CFLAGS) -c bintest.c
+
+fba.o: fba.c
+
+level0.o: level0.c osu.h tm.h
+
+merge.o: merge.c
+
+mirror.o: mirror.c
+
+odin2fits.o: odin2fits.c
+	$(CC) $(CFLAGS) $(DEFS) -c odin2fits.c
+
+odinfits.o: odinfits.c
+	$(CC) $(CFLAGS) $(DEFS) -c odinfits.c
+
+odinhdf.o: odinhdf.c smr_hdf.c smr_hdf_defs.h
+	$(CC) $(CFLAGS) $(DEFS) -c odinhdf.c
+
+options.o: options.c
+
+osu.o: osu.c tm.h
+
+shk.o: shk.c 
+
+smr_hdf.o: smr_hdf.c smr_hdf.h smr_hdf_defs.h smr_hdf_structs.h
+	$(CC) $(CFLAGS) $(DEFS)  -c smr_hdf.c
+
+rfits.o: rfits.c bintable.h
+	$(CC) $(CFLAGS) $(DEFS) -c rfits.c
+
+wfits.o: wfits.c bintable.h
+	$(CC) $(CFLAGS) $(DEFS) -c wfits.c
+
+rhdf.o: rhdf.c odinhdf.c odinhdf.h
+	$(CC) $(CFLAGS) $(DEFS)  -c rhdf.c
+
+whdf.o: whdf.c odinhdf.c odinhdf.h
+	$(CC) $(CFLAGS) $(DEFS)  -c whdf.c
+
+wmlab.o: wmlab.c 
+
+archive:
+	$(TAR) cvf odin.tar *.in *.c *.h; \
+	$(GZIP) -f odin.tar
+
+install: 
+	for i in $(ALL); \
+	  do $(INSTALL) -m 0755 -s $$i $(BINDIR); \
+	done
+
+clean:
+	rm -f *.o *.*~ core
+
+distclean: clean
+	rm -f Makefile config.*
+
+.c.o:
+	$(CC) $(CFLAGS) $(DEFS) -c -o $@ $*.c
