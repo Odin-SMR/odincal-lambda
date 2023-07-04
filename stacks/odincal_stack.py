@@ -1,4 +1,4 @@
-from aws_cdk import Duration, Fn, Stack, Size
+from aws_cdk import Duration, Fn, Stack
 from aws_cdk.aws_ec2 import Vpc, SubnetSelection, SubnetType
 from aws_cdk.aws_iam import Effect, PolicyStatement
 from aws_cdk.aws_lambda import (
@@ -71,7 +71,6 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
-            ephemeral_storage_size=Size.mebibytes(512),
             memory_size=1024,
             environment={
                 "ODIN_PG_HOST_SSM_NAME": pg_host_ssm_name,
