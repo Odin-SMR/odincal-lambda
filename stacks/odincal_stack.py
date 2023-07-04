@@ -18,10 +18,7 @@ class OdincalStack(Stack):
         scope: Construct,
         id: str,
         level0_queue_arn: str,
-        pg_host_ssm_name: str,
-        pg_user_ssm_name: str,
-        pg_pass_ssm_name: str,
-        pg_db_ssm_name: str,
+        ssm_root: str,
         psql_bucket_name: str,
         queue_retention_period: Duration = Duration.days(14),
         message_timeout: Duration = Duration.hours(24),
@@ -73,26 +70,20 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             memory_size=1024,
             environment={
-                "ODIN_PG_HOST_SSM_NAME": pg_host_ssm_name,
-                "ODIN_PG_USER_SSM_NAME": pg_user_ssm_name,
-                "ODIN_PG_PASS_SSM_NAME": pg_pass_ssm_name,
-                "ODIN_PG_DB_SSM_NAME": pg_db_ssm_name,
+                "ODIN_PG_HOST_SSM_NAME": f"{ssm_root}/host",
+                "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
+                "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
+                "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
                 "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
                 "ODIN_L1_NOTIFICATIONS": notification_queue.queue_name,
             },
         )
 
-        for ssm_name in (
-            pg_host_ssm_name,
-            pg_user_ssm_name,
-            pg_pass_ssm_name,
-            pg_db_ssm_name,
-        ):
-            level1_lambda.add_to_role_policy(PolicyStatement(
-                effect=Effect.ALLOW,
-                actions=["ssm:GetParameter"],
-                resources=[f"arn:aws:ssm:*:*:parameter{ssm_name}"]
-            ))
+        level1_lambda.add_to_role_policy(PolicyStatement(
+            effect=Effect.ALLOW,
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:*:*:parameter/{ssm_root}/*"]
+        ))
 
         psql_bucket = Bucket.from_bucket_name(
             self,
