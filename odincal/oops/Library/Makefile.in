@@ -1,0 +1,70 @@
+SHELL = /bin/sh
+RANLIB=@RANLIB@
+CC=@CC@
+CFLAGS=@CFLAGS@
+DEFS = @DEFS@
+INSTALL=@INSTALL@
+TAR=@TAR@
+GZIP=@GZIP@
+OBJECTS=accessor.o aclib.o aoslib.o shklib.o astrolib.o doppler.o drplib.o \
+	error.o fbalib.o geodetic.o index.o odinfft.o odinlib.o \
+	odintime.o recipes.o orbit.o utility.o vector.o \
+	avoid.o quat.o ephemeris.o skybeams.o
+
+libodin.a: $(OBJECTS)
+	$(AR) cr libodin.a $(OBJECTS) 
+	$(RANLIB) libodin.a
+
+accessor.o : accessor.c accessor.h odinscan.h odinlib.h
+
+aclib.o : aclib.c aclib.h odinscan.h
+
+aoslib.o : aoslib.c aoslib.h odinscan.h
+
+astrolib.o : astrolib.c astrolib.h vector.h 
+
+avoid.o: avoid.c attlib.h
+
+doppler.o : doppler.c astrolib.h odinscan.h attlib.h
+
+drplib.o : drplib.c drplib.h odinscan.h smrcdb.h
+
+error.o : error.c
+
+fbalib.o : fbalib.c fbalib.h odinscan.h
+
+geodetic.o: geodetic.c attlib.h
+
+ephemeris.o: ephemeris.c astrolib.h attlib.h
+
+index.o : index.c odinscan.h
+
+odinfft.o : odinfft.c odinfft.h
+
+odinlib.o : odinlib.c odinlib.h odinscan.h astrolib.h
+
+odintime.o : odintime.c odintime.h astrolib.h
+
+orbit.o: orbit.c attlib.h
+
+quat.o: quat.c attlib.h
+
+recipes.o : recipes.c recipes.h
+
+shklib.o: shklib.c shklib.h level0.h smrcdb.h
+
+skybeams.o: skybeams.c attlib.h odinscan.h astrolib.h 
+
+utility.o: utility.c utility.h
+
+vector.o: vector.c vector.h
+
+clean:
+	rm -f *.o *.*~ core
+
+distclean: clean
+	rm -f Makefile config.*
+
+.c.o:
+	$(CC) $(CFLAGS) $(DEFS) -c -o $@ $*.c
+

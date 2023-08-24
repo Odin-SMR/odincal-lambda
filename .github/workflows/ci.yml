@@ -1,0 +1,59 @@
+name: Odin SMR L1 processing CI
+
+on: [push]
+
+jobs:
+    stacks:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v2
+
+        - name: Setup Python
+          uses: actions/setup-python@v2
+          with:
+            python-version: '3.10'
+
+        - name: Install General Dependencies
+          run: |
+            python3.10 -m pip install --upgrade pip
+            pip install tox
+
+        - name: Run unit tests
+          run: |
+            tox
+
+    odincal:
+        runs-on: ubuntu-20.04
+        steps:
+        - uses: actions/checkout@v2
+
+        - name: Install General Dependencies
+          run: |
+            sudo apt install python2.7-dev
+            wget -c https://bootstrap.pypa.io/pip/2.7/get-pip.py
+            python2.7 get-pip.py
+            python2.7 -m pip install --upgrade pip
+            pip install tox
+
+        - name: Run unit tests
+          run: |
+            cd odincal/odincal
+            tox
+
+    oops:
+        runs-on: ubuntu-20.04
+        steps:
+        - uses: actions/checkout@v2
+
+        - name: Install General Dependencies
+          run: |
+            sudo apt install python2.7-dev
+            wget -c https://bootstrap.pypa.io/pip/2.7/get-pip.py
+            python2.7 get-pip.py
+            python2.7 -m pip install --upgrade pip
+            pip install tox
+
+        - name: Run unit tests
+          run: |
+            cd odincal/oops
+            tox

@@ -1,0 +1,5 @@
+-r requirements.txt
+mockito
+pip-tools
+pytest
+tox
