@@ -39,6 +39,27 @@ class OdincalStack(Stack):
             subnet_type=SubnetType.PRIVATE_WITH_EGRESS
         )
 
+        # Set up notification queue for Level 2
+        queue_name = "OdinSMROdincalNotificationQueue"
+        notification_queue = Queue(
+            self,
+            queue_name,
+            queue_name=queue_name,
+            retention_period=queue_retention_period,
+            visibility_timeout=message_timeout,
+            content_based_deduplication=True,
+            dead_letter_queue=DeadLetterQueue(
+                max_receive_count=message_attempts,
+                queue=Queue(
+                    self,
+                    "Failed" + queue_name,
+                    queue_name="Failed" + queue_name,
+                    retention_period=queue_retention_period,
+                    content_based_deduplication=True,
+                ),
+            ),
+        )
+
         # Set up Lambda functions
         calibrate_level1_lambda = DockerImageFunction(
             self,
@@ -67,12 +88,13 @@ class OdincalStack(Stack):
             resources=[f"arn:aws:ssm:*:*:parameter/{ssm_root}/*"]
         ))
 
+        notification_queue.grant_send_messages(calibrate_level1_lambda)
 
         # Set up tasks
         calibrate_level1_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalCalibrateLevel1Task",
-            lamba_function=calibrate_level1_lambda,
+            lambda_function=calibrate_level1_lambda,
             payload=sfn.TaskInput.from_object(
                 {
                     "acFile": sfn.JsonPath.string_at("$.name"),
@@ -126,25 +148,3 @@ class OdincalStack(Stack):
         )
 
         psql_bucket.grant_read(calibrate_level1_lambda)
-
-        queue_name = "OdinSMROdincalNotificationQueue"
-        notification_queue = Queue(
-            self,
-            queue_name,
-            queue_name=queue_name,
-            retention_period=queue_retention_period,
-            visibility_timeout=message_timeout,
-            content_based_deduplication=True,
-            dead_letter_queue=DeadLetterQueue(
-                max_receive_count=message_attempts,
-                queue=Queue(
-                    self,
-                    "Failed" + queue_name,
-                    queue_name="Failed" + queue_name,
-                    retention_period=queue_retention_period,
-                    content_based_deduplication=True,
-                ),
-            ),
-        )
-
-        notification_queue.grant_send_messages(calibrate_level1_lambda)
