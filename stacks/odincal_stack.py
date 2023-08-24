@@ -21,7 +21,7 @@ class OdincalStack(Stack):
         ssm_root: str,
         psql_bucket_name: str,
         queue_retention_period: Duration = Duration.days(14),
-        message_timeout: Duration = Duration.hours(24),
+        message_timeout: Duration = Duration.hours(12),
         message_attempts: int = 4,
         lambda_timeout: Duration = Duration.seconds(900),
         **kwargs
