@@ -10,7 +10,6 @@ app = App()
 OdincalStack(
     app,
     "OdinSMROdincalStack",
-    level0_queue_arn="todo:insert:arn:for:OdimSMRLevel0ACFilesQueue:here",
     ssm_root="/odin/psql",
     psql_bucket_name="odin-psql",
     env=env_EU,

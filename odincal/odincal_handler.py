@@ -39,24 +39,15 @@ def download_file(
     )
     return file_path
 
+
 def get_env_or_raise(variable_name):
     if (var := os.environ.get(variable_name)) is None:
         raise EnvironmentError(
-            f"{variable_name} is a required environment variable"
+            "{0} is a required environment variable".format(
+                variable_name,
+            )
         )
     return var
-
-
-def parse_event_message(event):
-    try:
-        message = json.loads(event["Records"][0]["body"])
-        ac_file = message["Records"][0]["s3"]["ACFile"]["name"]
-        backend = message["Records"][0]["s3"]["ACFile"]["backend"]
-        version = message["Records"][0]["s3"]["ACFile"]["version"]
-    except (KeyError, TypeError):
-        msg = "got invalid event: {0}".format(event)
-        raise InvalidMessage(msg)
-    return ac_file, backend, version
 
 
 def assert_has_attitude_coverage(
@@ -108,6 +99,9 @@ def handler(event, context):
     pg_db_ssm_name = get_env_or_raise("ODIN_PG_DB_SSM_NAME")
     psql_bucket = get_env_or_raise("ODIN_PSQL_BUCKET_NAME")
     notification_queue = get_env_or_raise("ODIN_L1_NOTIFICATIONS")
+    version = int(get_env_or_raise("ODIN_L1_VERSION"))
+    ac_file = event["acFile"]
+    backend = event["backend"].upper()
 
     with TemporaryDirectory(
         "psql",
@@ -165,9 +159,7 @@ def handler(event, context):
             db_name,
         )
         with psycopg2.connect(pg_string) as con:
-            ac_file, backend, version = parse_event_message(event)
             assert_has_attitude_coverage(ac_file, backend, version, con)
-            
             scans = level1b_importer(ac_file, backend, version, con)
 
     sqs_client = boto3.client("sqs")
@@ -176,3 +168,9 @@ def handler(event, context):
         notification_queue,
         scans,
     )
+    return {
+        "success": True,
+        "scans": len(scans),
+        "backend": backend,
+        "file": ac_file,
+    }
