@@ -47,7 +47,6 @@ class OdincalStack(Stack):
             queue_name=queue_name,
             retention_period=queue_retention_period,
             visibility_timeout=message_timeout,
-            content_based_deduplication=True,
             dead_letter_queue=DeadLetterQueue(
                 max_receive_count=message_attempts,
                 queue=Queue(
