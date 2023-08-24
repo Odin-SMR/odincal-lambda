@@ -54,7 +54,6 @@ class OdincalStack(Stack):
                     "Failed" + queue_name,
                     queue_name="Failed" + queue_name,
                     retention_period=queue_retention_period,
-                    content_based_deduplication=True,
                 ),
             ),
         )
