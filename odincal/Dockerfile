@@ -11,10 +11,10 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # Install oops and odincal
-COPY ./oops ${LAMBDA_TASK_ROOT}/oops
-COPY ./odincal ${LAMBDA_TASK_ROOT}/odincal
-RUN pip install ${LAMBDA_TASK_ROOT}/oops --target "${LAMBDA_TASK_ROOT}"
-RUN pip install ${LAMBDA_TASK_ROOT}/odincal --target "${LAMBDA_TASK_ROOT}"
+COPY ./oops /oops
+COPY ./odincal /odincal
+RUN pip install /oops --target "${LAMBDA_TASK_ROOT}"
+RUN pip install /odincal --target "${LAMBDA_TASK_ROOT}"
 
 # Setup handler
 COPY ./handler ${LAMBDA_TASK_ROOT}/handler
