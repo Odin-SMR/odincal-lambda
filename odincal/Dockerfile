@@ -17,5 +17,5 @@ RUN pip install ${LAMBDA_TASK_ROOT}/oops --target "${LAMBDA_TASK_ROOT}"
 RUN pip install ${LAMBDA_TASK_ROOT}/odincal --target "${LAMBDA_TASK_ROOT}"
 
 # Setup handler
-COPY ./odincal_handler.py ${LAMBDA_TASK_ROOT}
-CMD [ "odincal_handler.handler" ]
+COPY ./handler ${LAMBDA_TASK_ROOT}/handler
+CMD [ "handler.odincal_handler.handler" ]

@@ -1,7 +1,7 @@
 import json
 import os
 import stat
-from tempfile import TemporaryDirectory
+from tempfile import tempdir
 
 import boto3
 
@@ -105,64 +105,61 @@ def handler(event, context):
     ac_file = event["acFile"]
     backend = event["backend"].upper()
 
-    with TemporaryDirectory(
-        "psql",
-        "/tmp",
-    ) as psql_dir:
-        s3_client = boto3.client('s3')
+    psql_dir = tempdir()
+    s3_client = boto3.client('s3')
 
-        # Setup SSL for Postgres
-        pg_cert_path = download_file(
-            s3_client,
-            psql_bucket,
-            psql_dir,
-            "/postgresql.crt",
-        )
-        root_cert_path = download_file(
-            s3_client,
-            psql_bucket,
-            psql_dir,
-            "/root.crt",
-        )
-        pg_key_path = download_file(
-            s3_client,
-            psql_bucket,
-            psql_dir,
-            "/postgresql.key",
-        )
-        os.chmod(pg_key_path, stat.S_IWUSR | stat.S_IRUSR)
-        os.environ["PGSSLCERT"] = pg_cert_path
-        os.environ["PGSSLROOTCERT"] = root_cert_path
-        os.environ["PGSSLKEY"] = pg_key_path
-        import psycopg2
+    # Setup SSL for Postgres
+    pg_cert_path = download_file(
+        s3_client,
+        psql_bucket,
+        psql_dir,
+        "postgresql.crt",
+    )
+    root_cert_path = download_file(
+        s3_client,
+        psql_bucket,
+        psql_dir,
+        "root.crt",
+    )
+    pg_key_path = download_file(
+        s3_client,
+        psql_bucket,
+        psql_dir,
+        "postgresql.key",
+    )
+    os.chmod(pg_key_path, stat.S_IWUSR | stat.S_IRUSR)
+    os.environ["PGSSLCERT"] = pg_cert_path
+    os.environ["PGSSLROOTCERT"] = root_cert_path
+    os.environ["PGSSLKEY"] = pg_key_path
+    import psycopg2
 
-        ssm_client = boto3.client("ssm")
-        db_host = ssm_client.get_parameter(
-            Name=pg_host_ssm_name,
-            WithDecryption=True,
-        )["Parameter"]["Value"]
-        db_user = ssm_client.get_parameter(
-            Name=pg_user_ssm_name,
-            WithDecryption=True,
-        )["Parameter"]["Value"]
-        db_pass = ssm_client.get_parameter(
-            Name=pg_pass_ssm_name,
-            WithDecryption=True,
-        )["Parameter"]["Value"]
-        db_name = ssm_client.get_parameter(
-            Name=pg_db_ssm_name,
-            WithDecryption=True,
-        )["Parameter"]["Value"]
-        
-        pg_string = "host={0} user={1} password={2} dbname={3} sslmode=verify-ca".format(  # noqa: E501
-            db_host,
-            db_user,
-            db_pass,
-            db_name,
-        )
-        with psycopg2.connect(pg_string) as con:
-            assert_has_attitude_coverage(ac_file, backend, version, con)
-            scans = level1b_importer(ac_file, backend, version, con)
+    ssm_client = boto3.client("ssm")
+    db_host = ssm_client.get_parameter(
+        Name=pg_host_ssm_name,
+        WithDecryption=True,
+    )["Parameter"]["Value"]
+    db_user = ssm_client.get_parameter(
+        Name=pg_user_ssm_name,
+        WithDecryption=True,
+    )["Parameter"]["Value"]
+    db_pass = ssm_client.get_parameter(
+        Name=pg_pass_ssm_name,
+        WithDecryption=True,
+    )["Parameter"]["Value"]
+    db_name = ssm_client.get_parameter(
+        Name=pg_db_ssm_name,
+        WithDecryption=True,
+    )["Parameter"]["Value"]
+    
+    pg_string = "host={0} user={1} password={2} dbname={3} sslmode=verify-ca".format(  # noqa: E501
+        db_host,
+        db_user,
+        db_pass,
+        db_name,
+    )
+    with psycopg2.connect(pg_string) as con:
+        assert_has_attitude_coverage(ac_file, backend, version, con)
+        scans = level1b_importer(ac_file, backend, version, con)
 
     sqs_client = boto3.client("sqs")
     notify_queue(
