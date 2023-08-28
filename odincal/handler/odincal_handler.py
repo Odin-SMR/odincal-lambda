@@ -32,7 +32,7 @@ def download_file(
     file_name,
 ):
     file_path = os.path.join(path_name, file_name)
-    os.makedirs(path_name, exist_ok=True)
+    os.makedirs(path_name)
     s3_client.download_file(
         bucket_name,
         file_name,

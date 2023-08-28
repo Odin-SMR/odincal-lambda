@@ -124,12 +124,13 @@ class OdincalStack(Stack):
         )
         check_calibrate_status_state.when(
             sfn.Condition.boolean_equals(
-                "$CalibrateLevel1.Payload.success",
+                "$.CalibrateLevel1.Payload.success",
                 True,
             ),
             calibrate_level1_success_state,
         )
         check_calibrate_status_state.otherwise(calibrate_level1_fail_state)
+        calibrate_level1_task.next(check_calibrate_status_state)
 
         sfn.StateMachine(
             self,
