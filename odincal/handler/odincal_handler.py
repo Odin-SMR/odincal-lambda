@@ -1,7 +1,7 @@
 import json
 import os
 import stat
-from tempfile import tempdir
+from tempfile import mkdtemp
 
 import boto3
 
@@ -105,7 +105,7 @@ def handler(event, context):
     ac_file = event["acFile"]
     backend = event["backend"].upper()
 
-    psql_dir = tempdir()
+    psql_dir = mkdtemp()
     s3_client = boto3.client('s3')
 
     # Setup SSL for Postgres
