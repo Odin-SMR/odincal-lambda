@@ -10,6 +10,7 @@ from odincal.level1b_window_importer2 import level1b_importer
 
 
 ATT_BUFFER = 16 * 60 * 60 * 24 * 5  # Five day buffer
+ODINCAL_VERSION = 8
 
 
 class InvalidMessage(Exception):
@@ -41,7 +42,8 @@ def download_file(
 
 
 def get_env_or_raise(variable_name):
-    if (var := os.environ.get(variable_name)) is None:
+    var = os.environ.get(variable_name)
+    if var is None:
         raise EnvironmentError(
             "{0} is a required environment variable".format(
                 variable_name,
@@ -85,7 +87,7 @@ def notify_queue(
         MessageGroupId="Level1bScans",
     )
     if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
-        msg = "Notification failed for scans {0} with status {}".format(
+        msg = "Notification failed for scans {0} with status {1}".format(
             scans,
             response["ResponseMetadata"],
         )
@@ -99,7 +101,7 @@ def handler(event, context):
     pg_db_ssm_name = get_env_or_raise("ODIN_PG_DB_SSM_NAME")
     psql_bucket = get_env_or_raise("ODIN_PSQL_BUCKET_NAME")
     notification_queue = get_env_or_raise("ODIN_L1_NOTIFICATIONS")
-    version = int(get_env_or_raise("ODIN_L1_VERSION"))
+    version = ODINCAL_VERSION
     ac_file = event["acFile"]
     backend = event["backend"].upper()
 
