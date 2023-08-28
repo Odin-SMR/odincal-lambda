@@ -128,7 +128,7 @@ def handler(event, context):
             psql_dir,
             "/postgresql.key",
         )
-        os.chmod(pg_key_path, stat.S_IWUSR | stat.S_IRUSR | stat.S_IRGRP)
+        os.chmod(pg_key_path, stat.S_IWUSR | stat.S_IRUSR)
         os.environ["PGSSLCERT"] = pg_cert_path
         os.environ["PGSSLROOTCERT"] = root_cert_path
         os.environ["PGSSLKEY"] = pg_key_path
@@ -152,7 +152,7 @@ def handler(event, context):
             WithDecryption=True,
         )["Parameter"]["Value"]
         
-        pg_string = "host={0} user={1} password={2} dbname={3} ssl-mode=verify-ca".format(  # noqa: E501
+        pg_string = "host={0} user={1} password={2} dbname={3} sslmode=verify-ca".format(  # noqa: E501
             db_host,
             db_user,
             db_pass,

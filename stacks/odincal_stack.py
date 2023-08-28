@@ -83,7 +83,7 @@ class OdincalStack(Stack):
         calibrate_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter/{ssm_root}/*"]
+            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
         ))
 
         notification_queue.grant_send_messages(calibrate_level1_lambda)
