@@ -4,6 +4,7 @@ import stat
 from tempfile import mkdtemp
 
 import boto3
+from pg import DB
 
 from odincal.calibration_preprocess import PrepareData
 from odincal.level1b_window_importer2 import level1b_importer
@@ -32,7 +33,10 @@ def download_file(
     file_name,
 ):
     file_path = os.path.join(path_name, file_name)
-    os.makedirs(path_name)
+    try:
+        os.makedirs(path_name)
+    except OSError:
+        pass
     s3_client.download_file(
         bucket_name,
         file_name,
@@ -131,7 +135,6 @@ def handler(event, context):
     os.environ["PGSSLCERT"] = pg_cert_path
     os.environ["PGSSLROOTCERT"] = root_cert_path
     os.environ["PGSSLKEY"] = pg_key_path
-    import psycopg2
 
     ssm_client = boto3.client("ssm")
     db_host = ssm_client.get_parameter(
@@ -157,9 +160,9 @@ def handler(event, context):
         db_pass,
         db_name,
     )
-    with psycopg2.connect(pg_string) as con:
-        assert_has_attitude_coverage(ac_file, backend, version, con)
-        scans = level1b_importer(ac_file, backend, version, con)
+    con = DB(pg_string)
+    assert_has_attitude_coverage(ac_file, backend, version, con)
+    scans = level1b_importer(ac_file, backend, version, con)
 
     sqs_client = boto3.client("sqs")
     notify_queue(
