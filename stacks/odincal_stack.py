@@ -69,7 +69,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
-            memory_size=1024,
+            memory_size=2048,
             environment={
                 "ODIN_PG_HOST_SSM_NAME": f"{ssm_root}/host",
                 "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
