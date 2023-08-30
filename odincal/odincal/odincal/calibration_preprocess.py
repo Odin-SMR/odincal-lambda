@@ -14,10 +14,11 @@ SUN1 = 0x0008
 class PrepareData(object):
     '''prepare level0 database data for calibration'''
 
-    def __init__(self, acfile, backend, version, con):
+    def __init__(self, acfile, backend, version, con, pg_string=None):
         self.acfile = acfile
         self.backend = backend
         self.con = con
+        self.pg_string = pg_string
         self.version = version
 
     def get_stw_from_acfile(self):
@@ -45,13 +46,13 @@ class PrepareData(object):
 
     def att_level1_process(self, stw1, stw2, sodaversion):
         return att_level1_importer(
-            stw1, stw2, sodaversion, self.backend)
+            stw1, stw2, sodaversion, self.backend, self.pg_string)
 
     def shk_level1_process(self, stw1, stw2):
-        return shk_level1_importer(stw1, stw2, self.backend)
+        return shk_level1_importer(stw1, stw2, self.backend, self.pg_string)
 
     def ac_level1a_process(self, stw1, stw2):
-        return ac_level1a_importer(stw1, stw2, self.backend)
+        return ac_level1a_importer(stw1, stw2, self.backend, self.pg_string)
 
     def get_scan_starts(self, stw1, stw2):
         temp = [stw1, stw2]

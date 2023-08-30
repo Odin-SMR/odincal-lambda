@@ -69,7 +69,7 @@ def assert_has_attitude_coverage(
     result = query.dictresult()
     if result[0]["latest_att_stw"] - ac_stw_end < buffer:
         msg = "attitude data with STW {0} not recent enough for {1} with STW {2} to {3} (buffer required: {4})".format(  # noqa
-            result["latest_att_stw"],
+            result[0]["latest_att_stw"],
             ac_file,
             ac_stw_start,
             ac_stw_end,
@@ -106,7 +106,7 @@ def handler(event, context):
     psql_bucket = get_env_or_raise("ODIN_PSQL_BUCKET_NAME")
     notification_queue = get_env_or_raise("ODIN_L1_NOTIFICATIONS")
     version = ODINCAL_VERSION
-    ac_file = event["acFile"]
+    ac_file = os.path.split(event["acFile"])[-1]
     backend = event["backend"].upper()
 
     psql_dir = mkdtemp()
@@ -162,7 +162,7 @@ def handler(event, context):
     )
     con = DB(pg_string)
     assert_has_attitude_coverage(ac_file, backend, version, con)
-    scans = level1b_importer(ac_file, backend, version, con)
+    scans = level1b_importer(ac_file, backend, version, con, pg_string)
 
     sqs_client = boto3.client("sqs")
     notify_queue(

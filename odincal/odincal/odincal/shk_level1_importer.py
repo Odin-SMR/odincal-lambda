@@ -1,4 +1,4 @@
-from pg import ProgrammingError
+from pg import ProgrammingError, DB
 from odincal.database import ConfiguredDatabase
 
 
@@ -9,8 +9,11 @@ def Lookup(table, stw0):
     return table[1][i]
 
 
-def shk_level1_importer(stwa, stwb, backend):
-    con = ConfiguredDatabase()
+def shk_level1_importer(stwa, stwb, backend, pg_string=None):
+    if pg_string is None:
+        con = ConfiguredDatabase()
+    else:
+        con = DB(pg_string)
     temp = [stwa, stwb, backend]
     query = con.query('''select stw,backend,frontend from ac_level0
                        left join shk_level1 using (stw,backend)
@@ -116,3 +119,4 @@ def shk_level1_importer(stwa, stwb, backend):
                     pass
             # query=con.query('''select LO from shk_level1''')
             # res=query.getresult()
+    con.close()
