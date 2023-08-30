@@ -67,7 +67,7 @@ def assert_has_attitude_coverage(
     )
 
     result = query.dictresult()
-    if result["latest_att_stw"] - ac_stw_end < buffer:
+    if result[0]["latest_att_stw"] - ac_stw_end < buffer:
         msg = "attitude data with STW {0} not recent enough for {1} with STW {2} to {3} (buffer required: {4})".format(  # noqa
             result["latest_att_stw"],
             ac_file,
