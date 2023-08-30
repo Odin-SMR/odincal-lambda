@@ -88,7 +88,6 @@ def notify_queue(
         MessageBody=json.dumps({
             "scans": scans,
         }),
-        MessageGroupId="Level1bScans",
     )
     if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
         msg = "Notification failed for scans {0} with status {1}".format(
