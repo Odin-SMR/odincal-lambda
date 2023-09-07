@@ -21,7 +21,7 @@ class OdincalStack(Stack):
         ssm_root: str,
         psql_bucket_name: str,
         queue_retention_period: Duration = Duration.days(14),
-        message_timeout: Duration = Duration.hours(24),
+        message_timeout: Duration = Duration.hours(12),
         message_attempts: int = 4,
         lambda_timeout: Duration = Duration.seconds(900),
         **kwargs
@@ -47,7 +47,6 @@ class OdincalStack(Stack):
             queue_name=queue_name,
             retention_period=queue_retention_period,
             visibility_timeout=message_timeout,
-            content_based_deduplication=True,
             dead_letter_queue=DeadLetterQueue(
                 max_receive_count=message_attempts,
                 queue=Queue(
@@ -55,7 +54,6 @@ class OdincalStack(Stack):
                     "Failed" + queue_name,
                     queue_name="Failed" + queue_name,
                     retention_period=queue_retention_period,
-                    content_based_deduplication=True,
                 ),
             ),
         )
@@ -71,7 +69,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
-            memory_size=1024,
+            memory_size=2048,
             environment={
                 "ODIN_PG_HOST_SSM_NAME": f"{ssm_root}/host",
                 "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
@@ -85,7 +83,7 @@ class OdincalStack(Stack):
         calibrate_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter/{ssm_root}/*"]
+            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
         ))
 
         notification_queue.grant_send_messages(calibrate_level1_lambda)
@@ -126,12 +124,13 @@ class OdincalStack(Stack):
         )
         check_calibrate_status_state.when(
             sfn.Condition.boolean_equals(
-                "$CalibrateLevel1.Payload.success",
+                "$.CalibrateLevel1.Payload.success",
                 True,
             ),
             calibrate_level1_success_state,
         )
         check_calibrate_status_state.otherwise(calibrate_level1_fail_state)
+        calibrate_level1_task.next(check_calibrate_status_state)
 
         sfn.StateMachine(
             self,

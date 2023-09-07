@@ -212,11 +212,11 @@ def report_result(con, acfile, info):
     con.insert('processed', processtemp)
 
 
-def preprocess_data(acfile, backend, version, con, stw1, stw2, tdiff, logger):
+def preprocess_data(acfile, backend, version, con, stw1, stw2, tdiff, logger, pg_string=None):  # noqa
     """prepara data for calibration, i.e import data
        to database tables"""
 
-    prepare_data = PrepareData(acfile, backend, version, con)
+    prepare_data = PrepareData(acfile, backend, version, con, pg_string)
 
     # find out which sodaversion we have for this data
     sodaversion = prepare_data.get_soda_version(stw1, stw2)
@@ -264,14 +264,14 @@ class Level1BPreprocessDataError(Level1BImportError):
     pass
 
 
-def level1b_importer(acfile, backend, version, con):
+def level1b_importer(acfile, backend, version, con, pg_string=None):
     '''perform an intensity and frequency calibration'''
 
     logging.basicConfig()
     logger = logging.getLogger('level1b process')
     logger.info('processing file {0}'.format(acfile))
 
-    prepare_data = PrepareData(acfile, backend, version, con)
+    prepare_data = PrepareData(acfile, backend, version, con, pg_string)
 
     # find out max and min stw from acfile to calibrate
     stw1, stw2 = prepare_data.get_stw_from_acfile()
@@ -286,7 +286,7 @@ def level1b_importer(acfile, backend, version, con):
 
     tdiff = 45 * 60 * 16
     error = preprocess_data(
-        acfile, backend, version, con, stw1, stw2, tdiff, logger)
+        acfile, backend, version, con, stw1, stw2, tdiff, logger, pg_string)
     if error:
         msg = 'could not preprocess data for processing file {0}'.format(acfile)  # noqa
         raise Level1BPreprocessDataError(msg)

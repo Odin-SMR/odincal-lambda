@@ -8,6 +8,7 @@ from psycopg2 import InternalError, IntegrityError
 from StringIO import StringIO
 from odincal.config import config
 from datetime import datetime
+from pg import DB
 
 
 class Level1a:
@@ -151,8 +152,11 @@ def get_seq(mode):
     return seq, chips, band_start
 
 
-def ac_level1a_importer(stwa, stwb, backend):
-    con = ConfiguredDatabase()
+def ac_level1a_importer(stwa, stwb, backend, pg_string=None):
+    if pg_string is None:
+        con = ConfiguredDatabase()
+    else:
+        con = DB(pg_string)
     temp = [stwa, stwb, backend]
     query = con.query('''select ac_level0.stw,ac_level0.backend,
                  acd_mon,cc,mode from
@@ -190,7 +194,10 @@ def ac_level1a_importer(stwa, stwb, backend):
             '\\\\x' + abs(a).tostring().encode('hex') + '\t' +
             str(datetime.now()) + '\n')
 
-    conn = psycopg2.connect(config.get('database', 'pgstring'))
+    if pg_string is None:
+        conn = psycopg2.connect(config.get('database', 'pgstring'))
+    else:
+        conn = psycopg2.connect(pg_string)
     cur = conn.cursor()
     fgr.seek(0)
     cur.execute("create temporary table foo ( like ac_level1a );")

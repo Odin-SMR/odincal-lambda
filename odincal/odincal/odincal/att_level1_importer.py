@@ -6,6 +6,7 @@ from psycopg2 import InternalError, IntegrityError
 from odincal.config import config
 from odincal.database import ConfiguredDatabase
 from datetime import datetime
+from pg import DB
 
 
 def djl(year, mon, day, hour, min, secs):
@@ -16,10 +17,13 @@ def djl(year, mon, day, hour, min, secs):
     return jd
 
 
-def att_level1_importer(stwa, stwb, soda, backend):
+def att_level1_importer(stwa, stwb, soda, backend, pg_string=None):
     # soda=argv[1]
     temp = [stwa, stwb, soda, backend]
-    con = ConfiguredDatabase()
+    if pg_string is None:
+        con = ConfiguredDatabase()
+    else:
+        con = DB(pg_string)
     query = con.query('''select ac_level0.stw,ac_level0.backend,
                        inttime from ac_level0
                        left join attitude_level1 using (stw)
@@ -107,7 +111,10 @@ def att_level1_importer(stwa, stwb, soda, backend):
                       str(s.vlsr) + '\t' +
                       str(s.level) + '\t' +
                       str(datetime.now()) + '\n')
-    conn = psycopg2.connect(config.get('database', 'pgstring'))
+    if pg_string is None:
+        conn = psycopg2.connect(config.get('database', 'pgstring'))
+    else:
+        conn = psycopg2.connect(pg_string)
     cur = conn.cursor()
     fgr.seek(0)
     cur.execute("create temporary table foo ( like attitude_level1 );")
