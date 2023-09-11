@@ -20,9 +20,6 @@ class OdincalStack(Stack):
         id: str,
         ssm_root: str,
         psql_bucket_name: str,
-        queue_retention_period: Duration = Duration.days(14),
-        message_timeout: Duration = Duration.hours(12),
-        message_attempts: int = 4,
         lambda_timeout: Duration = Duration.seconds(900),
         **kwargs
     ) -> None:
@@ -37,25 +34,6 @@ class OdincalStack(Stack):
         )
         vpc_subnets = SubnetSelection(
             subnet_type=SubnetType.PRIVATE_WITH_EGRESS
-        )
-
-        # Set up notification queue for Level 2
-        queue_name = "OdinSMROdincalNotificationQueue"
-        notification_queue = Queue(
-            self,
-            queue_name,
-            queue_name=queue_name,
-            retention_period=queue_retention_period,
-            visibility_timeout=message_timeout,
-            dead_letter_queue=DeadLetterQueue(
-                max_receive_count=message_attempts,
-                queue=Queue(
-                    self,
-                    "Failed" + queue_name,
-                    queue_name="Failed" + queue_name,
-                    retention_period=queue_retention_period,
-                ),
-            ),
         )
 
         # Set up Lambda functions
@@ -76,7 +54,6 @@ class OdincalStack(Stack):
                 "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
                 "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
                 "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
-                "ODIN_L1_NOTIFICATIONS": notification_queue.queue_name,
             },
         )
 
@@ -85,8 +62,10 @@ class OdincalStack(Stack):
             actions=["ssm:GetParameter"],
             resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
         ))
-
-        notification_queue.grant_send_messages(calibrate_level1_lambda)
+        # TODO: Need lambdas
+        #   - DateInfo
+        #   - ScanInfo
+        #   - StartL2
 
         # Set up tasks
         calibrate_level1_task = tasks.LambdaInvoke(
@@ -107,6 +86,10 @@ class OdincalStack(Stack):
             backoff_rate=2,
             interval=Duration.days(5),
         )
+        # TODO: Need tasks
+        #   - DateInfo
+        #   - ScansInfo
+        #   - StartL2
 
         # Set up workflow
         calibrate_level1_fail_state = sfn.Fail(
@@ -123,6 +106,7 @@ class OdincalStack(Stack):
             "OdinSMRCheckCalibrateLevel1Status",
         )
         check_calibrate_status_state.when(
+            # TODO: Look at StatusCode instead
             sfn.Condition.boolean_equals(
                 "$.CalibrateLevel1.Payload.success",
                 True,
@@ -131,6 +115,10 @@ class OdincalStack(Stack):
         )
         check_calibrate_status_state.otherwise(calibrate_level1_fail_state)
         calibrate_level1_task.next(check_calibrate_status_state)
+        # TODO: Need steps etc. for
+        #   - DateInfo
+        #   - ScanInfo
+        #   - StartL2
 
         sfn.StateMachine(
             self,
@@ -147,3 +135,6 @@ class OdincalStack(Stack):
         )
 
         psql_bucket.grant_read(calibrate_level1_lambda)
+        # TODO: Need to add same permission for
+        #   - DateInfo
+        #   - ScanInfo

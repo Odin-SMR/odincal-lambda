@@ -170,8 +170,8 @@ def handler(event, context):
         scans,
     )
     return {
-        "success": True,
-        "scans": len(scans),
-        "backend": backend,
-        "file": ac_file,
+        "StatusCode": 200,
+        "Scans": scans,
+        "Backend": backend,
+        "File": ac_file,
     }
