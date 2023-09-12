@@ -82,9 +82,11 @@ def get_odin_data(
             break
         except requests.exceptions.HTTPError as msg:
             retries -= 1
+            if retries == 0:
+                raise RetriesExhaustedError(
+                    f"Retries exhausted for {url} ({msg})"
+                )
             sleep(SLEEP_TIME * 2 ** (MAX_RETRIES - retries - 1))
-    if retries == 0:
-        raise RetriesExhaustedError(f"Retries exhausted for {url}")
     return response.json()
 
 
@@ -94,7 +96,7 @@ def update_scans(
 ):
     """Populate database with 'cached' scans for each day.
     """
-    
+
     db_cursor = db_connection.cursor()
     all_scans = dict()
     for date_str, info in date_info.items():
@@ -130,7 +132,7 @@ def update_scans(
     return all_scans
 
 
-def handler(event: dict[str: list[int]], context: Any):
+def handler(event: dict[str, Any], context: Any):
     pg_credentials = get_parameters(
         [
             "/odin/psql/user",
@@ -140,7 +142,7 @@ def handler(event: dict[str: list[int]], context: Any):
         ]
     )
     db_connection = odin_connection(pg_credentials)
-    
+
     scans = update_scans(db_connection, event["DateInfo"])
 
     db_connection.close()

@@ -76,7 +76,9 @@ class OdincalStack(Stack):
                     "command": [
                         "bash",
                         "-c",
-                        "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output",
+                        "pip install -r requirements.txt -t /asset-output",
+                        "&&",
+                        "cp -au . /asset-output",
                     ],
                 },
             ),
@@ -96,7 +98,9 @@ class OdincalStack(Stack):
                     "command": [
                         "bash",
                         "-c",
-                        "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output",
+                        "pip install -r requirements.txt -t /asset-output",
+                        "&&",
+                        "cp -au . /asset-output",
                     ],
                 },
             ),

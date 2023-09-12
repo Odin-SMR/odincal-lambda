@@ -1,9 +1,7 @@
-from collections import namedtuple
-
 from psycopg2 import connect
 
 
-def odin_connection(credentials: namedtuple):
+def odin_connection(credentials):
     """Connects to the database, returns a connection"""
     connection_string = (
         "host={0} ".format(credentials.host) +

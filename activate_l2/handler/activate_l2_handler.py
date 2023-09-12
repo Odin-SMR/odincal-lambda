@@ -17,7 +17,6 @@ class StateMachineError(Exception):
     pass
 
 
-
 def find_arn() -> str | None:
     client = boto3.client("stepfunctions")
     results = client.list_state_machines()
