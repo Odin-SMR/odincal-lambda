@@ -265,7 +265,7 @@ class OdincalStack(Stack):
         check_activate_level2_status_state.otherwise(activate_level2_fail_state)
         activate_level2_task.next(check_activate_level2_status_state)
 
-        fn.StateMachine(
+        sfn.StateMachine(
             self,
             "OdinSMROdincalStateMachine",
             definition=calibrate_level1_task,
