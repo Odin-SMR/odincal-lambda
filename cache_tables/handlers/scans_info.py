@@ -6,7 +6,6 @@ import requests
 
 from .odin_connection import odin_connection
 from .ssm_parameters import get_parameters
-from .time_util import stw2datetime
 
 
 API_BASE = "https://odin-smr.org"
