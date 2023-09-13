@@ -103,7 +103,6 @@ def handler(event, context):
     pg_pass_ssm_name = get_env_or_raise("ODIN_PG_PASS_SSM_NAME")
     pg_db_ssm_name = get_env_or_raise("ODIN_PG_DB_SSM_NAME")
     psql_bucket = get_env_or_raise("ODIN_PSQL_BUCKET_NAME")
-    notification_queue = get_env_or_raise("ODIN_L1_NOTIFICATIONS")
     version = ODINCAL_VERSION
     ac_file = os.path.split(event["acFile"])[-1]
     backend = event["backend"].upper()
@@ -163,12 +162,6 @@ def handler(event, context):
     assert_has_attitude_coverage(ac_file, backend, version, con)
     scans = level1b_importer(ac_file, backend, version, con, pg_string)
 
-    sqs_client = boto3.client("sqs")
-    notify_queue(
-        sqs_client,
-        notification_queue,
-        scans,
-    )
     return {
         "StatusCode": 200,
         "Scans": scans,
