@@ -60,8 +60,33 @@ class OdincalStack(Stack):
                 "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
             },
         )
-
         preprocess_level1_lambda.add_to_role_policy(PolicyStatement(
+            effect=Effect.ALLOW,
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
+        ))
+
+        get_job_info_level1_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalGetJobInfoLambda",
+            code=DockerImageCode.from_image_asset(
+                "./odincal",
+                cmd=["handler.odincal_handler.get_job_info_handler"],
+            ),
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            memory_size=2048,
+            environment={
+                "ODIN_PG_HOST_SSM_NAME": f"{ssm_root}/host",
+                "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
+                "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
+                "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
+                "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
+            },
+        )
+        get_job_info_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
             resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
@@ -87,7 +112,6 @@ class OdincalStack(Stack):
                 "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
             },
         )
-
         calibrate_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
@@ -114,6 +138,7 @@ class OdincalStack(Stack):
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
+            memory_size=1024,
         )
 
         scans_info_lambda = Function(
@@ -136,6 +161,7 @@ class OdincalStack(Stack):
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
+            memory_size=1024,
         )
 
         activate_level2_lambda = Function(
@@ -184,6 +210,31 @@ class OdincalStack(Stack):
             interval=Duration.minutes(1),
         )
 
+        job_info_level1_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalGetJobInfoLevel1Task",
+            lambda_function=get_job_info_level1_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "acFile": sfn.JsonPath.string_at("$.name"),
+                    "backend": sfn.JsonPath.string_at("$.type"),
+                    "STW1": sfn.JsonPath.number_at(
+                        "$.PreprocessLevel1.Payload.STW1"
+                    ),
+                    "STW2": sfn.JsonPath.number_at(
+                        "$.PreprocessLevel1.Payload.STW2"
+                    ),
+                },
+            ),
+            result_path="$.JobInfo",
+        )
+        job_info_level1_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=4,
+            backoff_rate=2,
+            interval=Duration.minutes(1),
+        )
+
         calibrate_level1_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalCalibrateLevel1Task",
@@ -193,10 +244,10 @@ class OdincalStack(Stack):
                     "acFile": sfn.JsonPath.string_at("$.name"),
                     "backend": sfn.JsonPath.string_at("$.type"),
                     "ScanStarts": sfn.JsonPath.list_at(
-                        "$.PreprocessLevel1.Payload.ScanStarts"
+                        "$.JobInfo.Payload.ScanStarts"
                     ),
                     "SodaVersion": sfn.JsonPath.number_at(
-                        "$.PreprocessLevel1.Payload.SodaVersion"
+                        "$.JobInfo.Payload.SodaVersion"
                     ),
                 },
             ),
@@ -279,6 +330,16 @@ class OdincalStack(Stack):
             "OdinSMRCheckPreprocessLevel1Status",
         )
 
+        job_info_level1_fail_state = sfn.Fail(
+            self,
+            "OdinSMRGetJobInfoLevel1Fail",
+            comment="Somthing went wrong when getting job for Level 0 file",
+        )
+        check_job_info_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckGetJobInfoLevel1Status",
+        )
+
         calibrate_level1_fail_state = sfn.Fail(
             self,
             "OdinSMRCalibrateLevel1Fail",
@@ -328,10 +389,20 @@ class OdincalStack(Stack):
                 "$.PreprocessLevel1.Payload.StatusCode",
                 200,
             ),
-            calibrate_level1_task,
+            job_info_level1_task,
         )
         check_preprocess_status_state.otherwise(preprocess_level1_fail_state)
         preprocess_level1_task.next(check_preprocess_status_state)
+
+        check_job_info_status_state.when(
+            sfn.Condition.number_equals(
+                "$.JobInfo.Payload.StatusCode",
+                200,
+            ),
+            calibrate_level1_task,
+        )
+        check_job_info_status_state.otherwise(job_info_level1_fail_state)
+        job_info_level1_task.next(check_job_info_status_state)
 
         check_calibrate_status_state.when(
             sfn.Condition.number_equals(
@@ -388,6 +459,7 @@ class OdincalStack(Stack):
         )
 
         psql_bucket.grant_read(preprocess_level1_lambda)
+        psql_bucket.grant_read(get_job_info_level1_lambda)
         psql_bucket.grant_read(calibrate_level1_lambda)
         psql_bucket.grant_read(date_info_lambda)
         psql_bucket.grant_read(scans_info_lambda)

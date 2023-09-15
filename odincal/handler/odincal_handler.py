@@ -9,6 +9,7 @@ from pg import DB
 from odincal.calibration_preprocess import PrepareData
 from odincal.level1b_window_importer2 import (
     preprocess_level1b,
+    job_info_level1b,
     import_level1b,
 )
 
@@ -160,6 +161,61 @@ def setup_postgres():
     )
 
 
+def preprocess_handler(event, context):
+    version = ODINCAL_VERSION
+    ac_file = os.path.split(event["acFile"])[-1]
+    backend = event["backend"].upper()
+
+    pg_string = setup_postgres()
+    con = DB(pg_string)
+
+    assert_has_attitude_coverage(ac_file, backend, version, con)
+    stw1, stw2 = preprocess_level1b(
+        ac_file,
+        backend,
+        version,
+        con,
+        pg_string,
+    )
+
+    return {
+        "StatusCode": 200,
+        "STW1": stw1,
+        "STW2": stw2,
+        "Backend": backend,
+        "File": ac_file,
+    }
+
+
+def get_job_info_handler(event, context):
+    version = ODINCAL_VERSION
+    ac_file = os.path.split(event["acFile"])[-1]
+    backend = event["backend"].upper()
+    stw1 = event["STW1"]
+    stw2 = event["STW2"]
+
+    pg_string = setup_postgres()
+    con = DB(pg_string)
+
+    scan_starts, soda_version = job_info_level1b(
+        stw1,
+        stw2,
+        ac_file,
+        backend,
+        version,
+        con,
+        pg_string,
+    )
+
+    return {
+        "StatusCode": 200,
+        "ScanStarts": scan_starts,
+        "SodaVersion": soda_version,
+        "Backend": backend,
+        "File": ac_file,
+    }
+
+
 def import_handler(event, context):
     version = ODINCAL_VERSION
     ac_file = os.path.split(event["acFile"])[-1]
@@ -183,32 +239,6 @@ def import_handler(event, context):
     return {
         "StatusCode": 200,
         "Scans": scans,
-        "Backend": backend,
-        "File": ac_file,
-    }
-
-
-def preprocess_handler(event, context):
-    version = ODINCAL_VERSION
-    ac_file = os.path.split(event["acFile"])[-1]
-    backend = event["backend"].upper()
-
-    pg_string = setup_postgres()
-    con = DB(pg_string)
-
-    assert_has_attitude_coverage(ac_file, backend, version, con)
-    scan_starts, soda_version = preprocess_level1b(
-        ac_file,
-        backend,
-        version,
-        con,
-        pg_string,
-    )
-
-    return {
-        "StatusCode": 200,
-        "ScanStarts": scan_starts,
-        "SodaVersion": soda_version,
         "Backend": backend,
         "File": ac_file,
     }
