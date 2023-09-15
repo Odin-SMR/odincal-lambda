@@ -72,6 +72,7 @@ class OdincalStack(Stack):
             "OdinSMROdincalLambda",
             code=DockerImageCode.from_image_asset(
                 "./odincal",
+                cmd=["handler.odincal_handler.import_handler"],
             ),
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -161,7 +162,7 @@ class OdincalStack(Stack):
         preprocess_level1_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalPreprocessLevel1Task",
-            lambda_function=calibrate_level1_lambda,
+            lambda_function=preprocess_level1_lambda,
             payload=sfn.TaskInput.from_object(
                 {
                     "acFile": sfn.JsonPath.string_at("$.name"),
@@ -268,7 +269,6 @@ class OdincalStack(Stack):
         )
 
         # Set up workflow
-        # TODO: workflow with preprocess
         preprocess_level1_fail_state = sfn.Fail(
             self,
             "OdinSMRPreprocessLevel1Fail",
