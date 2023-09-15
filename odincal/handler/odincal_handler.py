@@ -7,7 +7,10 @@ import boto3
 from pg import DB
 
 from odincal.calibration_preprocess import PrepareData
-from odincal.level1b_window_importer2 import level1b_importer
+from odincal.level1b_window_importer2 import (
+    preprocess_level1b,
+    import_level1b,
+)
 
 
 ATT_BUFFER = 16 * 60 * 60 * 24 * 5  # Five day buffer
@@ -97,15 +100,12 @@ def notify_queue(
         raise NotifyFailed(msg)
 
 
-def handler(event, context):
+def setup_postgres():
     pg_host_ssm_name = get_env_or_raise("ODIN_PG_HOST_SSM_NAME")
     pg_user_ssm_name = get_env_or_raise("ODIN_PG_USER_SSM_NAME")
     pg_pass_ssm_name = get_env_or_raise("ODIN_PG_PASS_SSM_NAME")
     pg_db_ssm_name = get_env_or_raise("ODIN_PG_DB_SSM_NAME")
     psql_bucket = get_env_or_raise("ODIN_PSQL_BUCKET_NAME")
-    version = ODINCAL_VERSION
-    ac_file = os.path.split(event["acFile"])[-1]
-    backend = event["backend"].upper()
 
     psql_dir = mkdtemp()
     s3_client = boto3.client('s3')
@@ -151,20 +151,64 @@ def handler(event, context):
         Name=pg_db_ssm_name,
         WithDecryption=True,
     )["Parameter"]["Value"]
-    
-    pg_string = "host={0} user={1} password={2} dbname={3} sslmode=verify-ca".format(  # noqa: E501
+
+    return "host={0} user={1} password={2} dbname={3} sslmode=verify-ca".format(  # noqa: E501
         db_host,
         db_user,
         db_pass,
         db_name,
     )
+
+
+def import_handler(event, context):
+    version = ODINCAL_VERSION
+    ac_file = os.path.split(event["acFile"])[-1]
+    backend = event["backend"].upper()
+    soda_version = event["SodaVersion"]
+    scan_starts = event["ScanStarts"]
+
+    pg_string = setup_postgres()
     con = DB(pg_string)
-    assert_has_attitude_coverage(ac_file, backend, version, con)
-    scans = level1b_importer(ac_file, backend, version, con, pg_string)
+
+    scans = import_level1b(
+        scan_starts,
+        soda_version,
+        ac_file,
+        backend,
+        version,
+        con,
+        pg_string,
+    )
 
     return {
         "StatusCode": 200,
         "Scans": scans,
+        "Backend": backend,
+        "File": ac_file,
+    }
+
+
+def preprocess_handler(event, context):
+    version = ODINCAL_VERSION
+    ac_file = os.path.split(event["acFile"])[-1]
+    backend = event["backend"].upper()
+
+    pg_string = setup_postgres()
+    con = DB(pg_string)
+
+    assert_has_attitude_coverage(ac_file, backend, version, con)
+    scan_starts, soda_version = preprocess_level1b(
+        ac_file,
+        backend,
+        version,
+        con,
+        pg_string,
+    )
+
+    return {
+        "StatusCode": 200,
+        "ScanStarts": scan_starts,
+        "SodaVersion": soda_version,
         "Backend": backend,
         "File": ac_file,
     }

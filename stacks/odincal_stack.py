@@ -40,6 +40,33 @@ class OdincalStack(Stack):
         )
 
         # Set up Lambda functions
+        preprocess_level1_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalPreProcessLambda",
+            code=DockerImageCode.from_image_asset(
+                "./odincal",
+                cmd=["handler.odincal_handler.preprocess_handler"],
+            ),
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            memory_size=2048,
+            environment={
+                "ODIN_PG_HOST_SSM_NAME": f"{ssm_root}/host",
+                "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
+                "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
+                "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
+                "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
+            },
+        )
+
+        preprocess_level1_lambda.add_to_role_policy(PolicyStatement(
+            effect=Effect.ALLOW,
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
+        ))
+
         calibrate_level1_lambda = DockerImageFunction(
             self,
             "OdinSMROdincalLambda",
@@ -131,6 +158,31 @@ class OdincalStack(Stack):
         )
 
         # Set up tasks
+        preprocess_level1_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalPreprocessLevel1Task",
+            lambda_function=calibrate_level1_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "acFile": sfn.JsonPath.string_at("$.name"),
+                    "backend": sfn.JsonPath.string_at("$.type"),
+                },
+            ),
+            result_path="$.PreprocessLevel1",
+        )
+        preprocess_level1_task.add_retry(
+            errors=["BadAttitude"],
+            max_attempts=3,
+            backoff_rate=2,
+            interval=Duration.days(5),
+        )
+        preprocess_level1_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=4,
+            backoff_rate=2,
+            interval=Duration.minutes(1),
+        )
+
         calibrate_level1_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalCalibrateLevel1Task",
@@ -139,52 +191,94 @@ class OdincalStack(Stack):
                 {
                     "acFile": sfn.JsonPath.string_at("$.name"),
                     "backend": sfn.JsonPath.string_at("$.type"),
+                    "ScanStarts": sfn.JsonPath.list_at(
+                        "$.PreprocessLevel1.Payload.ScanStarts"
+                    ),
+                    "SodaVersion": sfn.JsonPath.number_at(
+                        "$.PreprocessLevel1.Payload.SodaVersion"
+                    ),
                 },
             ),
             result_path="$.CalibrateLevel1",
         )
         calibrate_level1_task.add_retry(
-            errors=["BadAttitude"],
-            max_attempts=3,
+            errors=["States.ALL"],
+            max_attempts=4,
             backoff_rate=2,
-            interval=Duration.days(5),
+            interval=Duration.minutes(1),
         )
+
         date_info_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalDateInfoTask",
             lambda_function=date_info_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "Scans": sfn.JsonPath.string_at("$.CalibrateLevel1.Scans"),
+                    "Scans": sfn.JsonPath.string_at(
+                        "$.CalibrateLevel1.Payload.Scans"
+                    ),
                 },
             ),
             result_path="$.DateInfo",
         )
+        date_info_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=4,
+            backoff_rate=2,
+            interval=Duration.minutes(1),
+        )
+
         scans_info_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalScansInfoTask",
             lambda_function=scans_info_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "DateInfo": sfn.JsonPath.string_at("$.DateInfo.DateInfo"),
+                    "DateInfo": sfn.JsonPath.list_at(
+                        "$.DateInfo.Payload.DateInfo"
+                    ),
                 },
             ),
             result_path="$.ScansInfo",
         )
+        scans_info_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=4,
+            backoff_rate=2,
+            interval=Duration.minutes(1),
+        )
+
         activate_level2_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalActivateLevel2Task",
             lambda_function=scans_info_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "Scans": sfn.JsonPath.string_at("$.ScansInfo.ScansInfo"),
+                    "Scans": sfn.JsonPath.list_at("$.ScansInfo.ScansInfo"),
                     "File": sfn.JsonPath.string_at("$.name"),
                 },
             ),
             result_path="$.ActivateLevel2",
         )
+        activate_level2_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=4,
+            backoff_rate=2,
+            interval=Duration.minutes(1),
+        )
 
         # Set up workflow
+        # TODO: workflow with preprocess
+        preprocess_level1_fail_state = sfn.Fail(
+            self,
+            "OdinSMRPreprocessLevel1Fail",
+            comment="Somthing went wrong when preprocessing Level 0 file",
+        )
+        check_preprocess_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckPreprocessLevel1Status",
+        )
+
         calibrate_level1_fail_state = sfn.Fail(
             self,
             "OdinSMRCalibrateLevel1Fail",
@@ -229,6 +323,16 @@ class OdincalStack(Stack):
             "OdinSMRActivateLevel2Status",
         )
 
+        check_preprocess_status_state.when(
+            sfn.Condition.number_equals(
+                "$.PreprocessLevel1.Payload.StatusCode",
+                200,
+            ),
+            calibrate_level1_task,
+        )
+        check_preprocess_status_state.otherwise(preprocess_level1_fail_state)
+        preprocess_level1_task.next(check_preprocess_status_state)
+
         check_calibrate_status_state.when(
             sfn.Condition.number_equals(
                 "$.CalibrateLevel1.Payload.StatusCode",
@@ -272,7 +376,7 @@ class OdincalStack(Stack):
         sfn.StateMachine(
             self,
             "OdinSMROdincalStateMachine",
-            definition=calibrate_level1_task,
+            definition=preprocess_level1_task,
             state_machine_name="OdinSMROdincalStateMachine",
         )
 
@@ -283,6 +387,7 @@ class OdincalStack(Stack):
             psql_bucket_name,
         )
 
+        psql_bucket.grant_read(preprocess_level1_lambda)
         psql_bucket.grant_read(calibrate_level1_lambda)
         psql_bucket.grant_read(date_info_lambda)
         psql_bucket.grant_read(scans_info_lambda)
