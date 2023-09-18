@@ -303,7 +303,7 @@ class OdincalStack(Stack):
         activate_level2_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalActivateLevel2Task",
-            lambda_function=scans_info_lambda,
+            lambda_function=activate_level2_lambda,
             payload=sfn.TaskInput.from_object(
                 {
                     "Scans": sfn.JsonPath.list_at("$.ScansInfo.ScansInfo"),
