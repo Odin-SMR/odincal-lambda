@@ -1,4 +1,4 @@
-from pg import ProgrammingError, DB
+from pg import IntegrityError, ProgrammingError, DB
 from odincal.database import ConfiguredDatabase
 
 
@@ -115,7 +115,7 @@ def shk_level1_importer(stwa, stwb, backend, pg_string=None):
             if insert == 1:
                 try:
                     con.insert('shk_level1', shkdict)
-                except ProgrammingError:
+                except (ProgrammingError, IntegrityError):
                     pass
             # query=con.query('''select LO from shk_level1''')
             # res=query.getresult()

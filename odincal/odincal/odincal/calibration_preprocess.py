@@ -141,7 +141,7 @@ class PrepareData(object):
         else:
             raise BadBack("Unknown backend {0}".format(self.backend))
 
-        results = query.dictresults()
+        results = query.dictresult()
         if results == []:
             raise NoScansError(query_str)
         return results

@@ -295,6 +295,24 @@ def preprocess_level1b(acfile, backend, version, con, pg_string=None):
         msg = 'could not preprocess data for processing file {0}'.format(acfile)  # noqa
         raise Level1BPreprocessDataError(msg)
 
+    return stw1, stw2
+
+
+def job_info_level1b(
+    stw1,
+    stw2,
+    acfile,
+    backend,
+    version,
+    con,
+    pg_string=None,
+):
+    logging.basicConfig()
+    logger = logging.getLogger('level1b get job batch info')
+    logger.info('getting job batch info for file {0}'.format(acfile))
+
+    prepare_data = PrepareData(acfile, backend, version, con, pg_string)
+
     # find out which scan that starts in the file to calibrate
     try:
         scanstarts = prepare_data.get_scan_starts(stw1, stw2)
@@ -399,13 +417,18 @@ def import_level1b(
 
 
 def level1b_importer(acfile, backend, version, con, pg_string=None):
-    '''perform preprocessing, intensity and frequency calibration'''
+    '''perform preprocessing, and intensity and frequency calibration'''
 
-    logging.basicConfig()
-    logger = logging.getLogger('level1b process')
-    logger.info('processing file {0}'.format(acfile))
-
-    scanstarts, sodaversion = preprocess_level1b(
+    stw1, stw2 = preprocess_level1b(
+        acfile,
+        backend,
+        version,
+        con,
+        pg_string,
+    )
+    scanstarts, sodaversion = job_info_level1b(
+        stw1,
+        stw2,
         acfile,
         backend,
         version,
