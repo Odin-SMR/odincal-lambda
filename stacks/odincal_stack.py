@@ -122,15 +122,13 @@ class OdincalStack(Stack):
             self,
             "OdinSMROdincalDateInfoLambda",
             code=Code.from_asset(
-                "./cache_tables",
+                "cache_tables",
                 bundling={
                     "image": Runtime.PYTHON_3_10.bundling_image,
                     "command": [
                         "bash",
                         "-c",
-                        "pip install -r requirements.txt -t /asset-output",
-                        "&&",
-                        "cp -au . /asset-output",
+                        "pip install -r requirements.txt -t /asset-output && cp -aur . /asset-output",  # noqa: E501
                     ],
                 },
             ),
@@ -145,15 +143,13 @@ class OdincalStack(Stack):
             self,
             "OdinSMROdincalScansInfoLambda",
             code=Code.from_asset(
-                "./cache_tables",
+                "cache_tables",
                 bundling={
                     "image": Runtime.PYTHON_3_10.bundling_image,
                     "command": [
                         "bash",
                         "-c",
-                        "pip install -r requirements.txt -t /asset-output",
-                        "&&",
-                        "cp -au . /asset-output",
+                        "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output",  # noqa: 501
                     ],
                 },
             ),
@@ -166,8 +162,8 @@ class OdincalStack(Stack):
 
         activate_level2_lambda = Function(
             self,
-            "OdinSMRLevel0Lambda",
-            code=InlineCode.from_asset("./activate_l2"),
+            "OdinSMROdincalActivateLevel2Lambda",
+            code=InlineCode.from_asset("activate_l2"),
             handler="handler.activate_l2_handler.activate_l2_handler",
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
