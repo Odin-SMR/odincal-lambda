@@ -138,6 +138,11 @@ class OdincalStack(Stack):
             runtime=Runtime.PYTHON_3_10,
             memory_size=1024,
         )
+        date_info_lambda.add_to_role_policy(PolicyStatement(
+            effect=Effect.ALLOW,
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
+        ))
 
         scans_info_lambda = Function(
             self,
@@ -159,6 +164,11 @@ class OdincalStack(Stack):
             runtime=Runtime.PYTHON_3_10,
             memory_size=1024,
         )
+        scans_info_lambda.add_to_role_policy(PolicyStatement(
+            effect=Effect.ALLOW,
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
+        ))
 
         activate_level2_lambda = Function(
             self,
