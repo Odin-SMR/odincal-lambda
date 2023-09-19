@@ -2,14 +2,16 @@ import datetime as dt
 from tempfile import TemporaryDirectory
 from typing import Any
 
+from psycopg2.extras import RealDictCursor
+
 from .odin_connection import odin_connection, setup_postgres
 from .ssm_parameters import get_parameters
 from .time_util import datetime2mjd, mjd2stw, stw2datetime
 
 
-def gen_data(db_connection, query_string):
-    query = db_connection.query(query_string)
-    result = query.dictresult()
+def gen_data(db_cursor, query_string: str) -> list[dict]:
+    db_cursor.execute(query_string)
+    result = db_cursor.fetchall()
     info_list = []
     for row in result:
         info_dict = {}
@@ -20,7 +22,7 @@ def gen_data(db_connection, query_string):
     return info_list
 
 
-def gen_query(stw1, stw2):
+def gen_query(stw1: int, stw2: int) -> str:
     query_str = (
         "select freqmode, backend, count(distinct(stw)) "
         "from ac_cal_level1b "
@@ -31,7 +33,7 @@ def gen_query(stw1, stw2):
     return query_str
 
 
-def get_date_info(db_connection, date: dt.date | dt.datetime):
+def get_date_info(db_cursor, date: dt.date | dt.datetime) -> list[dict]:
     start_date = dt.datetime(date.year, date.month, date.day)
     end_date = start_date + dt.timedelta(days=1)
     mjd_start = int(datetime2mjd(start_date))
@@ -39,7 +41,7 @@ def get_date_info(db_connection, date: dt.date | dt.datetime):
     stw_start = mjd2stw(mjd_start)
     stw_end = mjd2stw(mjd_end)
     query_str = gen_query(stw_start, stw_end)
-    return gen_data(db_connection, query_str)
+    return gen_data(db_cursor, query_str)
 
 
 def add_to_database(
@@ -51,9 +53,10 @@ def add_to_database(
 ):
     """Add an entry to the database, update if necessary"""
     cursor.execute(
-        "insert into measurements_cache values(%s,%s,%s,%s)"
-        "on conflict(date, freqmode)"
-        "do update set nscans=greatest(EXCLUDED.nscans, nscans)",
+        "insert into measurements_cache values(%s,%s,%s,%s) "
+        "on conflict on constraint unique_measurement_constraint "
+        "do update set "
+        "nscans=greatest(EXCLUDED.nscans, measurements_cache.nscans)",
         (day, freqmode, numscans, backend),
     )
 
@@ -62,7 +65,7 @@ def update_measurements(
     db_connection,
     start_date: dt.date,
     end_date: dt.date | None = None,
-):
+) -> dict[str, list]:
     """Populate database with 'cached' stats for measurements each day.
 
     Walks backwards from end_date to start_date, but typically run for one day.
@@ -74,12 +77,12 @@ def update_measurements(
         current_date = end_date
     earliest_date = start_date
 
-    db_cursor = db_connection.cursor()
+    db_cursor = db_connection.cursor(cursor_factory=RealDictCursor)
     freqmode_info: dict[str, list] = dict()
     while current_date >= earliest_date:
-        date_info = get_date_info(db_connection, current_date)
+        date_info = get_date_info(db_cursor, current_date)
         freqmode_info[current_date.isoformat()] = []
-        for freqmode in date_info['Info']:
+        for freqmode in date_info:
             add_to_database(
                 db_cursor,
                 current_date,
@@ -100,7 +103,7 @@ def update_measurements(
     return freqmode_info
 
 
-def handler(event: dict[str, list[int]], context: Any):
+def handler(event: dict[str, list[int]], context: Any) -> dict[str, Any]:
     pg_credentials = get_parameters(
         [
             "/odin/psql/user",
@@ -117,7 +120,7 @@ def handler(event: dict[str, list[int]], context: Any):
         setup_postgres(psql_dir)
         db_connection = odin_connection(pg_credentials)
 
-        dates = [stw2datetime(scan_id) for scan_id in event["Scans"]]
+        dates = [stw2datetime(scan_id).date() for scan_id in event["Scans"]]
         date_info = update_measurements(db_connection, min(dates), max(dates))
 
         db_connection.close()
