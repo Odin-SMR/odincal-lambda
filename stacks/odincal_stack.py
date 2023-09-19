@@ -137,6 +137,8 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
             memory_size=1024,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
         )
         date_info_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
@@ -163,6 +165,8 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
             memory_size=1024,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
         )
         scans_info_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
