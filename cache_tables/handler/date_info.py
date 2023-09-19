@@ -117,7 +117,7 @@ def handler(event: dict[str, list[int]], context: Any):
         setup_postgres(psql_dir)
         db_connection = odin_connection(pg_credentials)
 
-        dates = [stw2datetime(scan_id) for scan_id in event["scans"]]
+        dates = [stw2datetime(scan_id) for scan_id in event["Scans"]]
         date_info = update_measurements(db_connection, min(dates), max(dates))
 
         db_connection.close()
