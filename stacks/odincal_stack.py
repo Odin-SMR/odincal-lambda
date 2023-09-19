@@ -299,6 +299,9 @@ class OdincalStack(Stack):
                     "DateInfo": sfn.JsonPath.list_at(
                         "$.DateInfo.Payload.DateInfo"
                     ),
+                    "Scans": sfn.JsonPath.string_at(
+                        "$.CalibrateLevel1.Payload.Scans"
+                    ),
                 },
             ),
             result_path="$.ScansInfo",
@@ -316,7 +319,9 @@ class OdincalStack(Stack):
             lambda_function=activate_level2_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "Scans": sfn.JsonPath.list_at("$.ScansInfo.ScansInfo"),
+                    "Scans": sfn.JsonPath.list_at(
+                        "$.ScansInfo.Payload.ScansInfo"
+                    ),
                     "File": sfn.JsonPath.string_at("$.name"),
                 },
             ),
