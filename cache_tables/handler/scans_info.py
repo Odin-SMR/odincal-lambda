@@ -32,7 +32,7 @@ def add_to_database(
     scanid: int,
     sunzd: float,
     quality: int,
-):
+) -> None:
     """Add an entry to the database, update if necessary"""
 
     cursor.execute(
@@ -40,14 +40,14 @@ def add_to_database(
         'values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
         'on conflict(date, freqmode, scanid) '
         'do update set '
-        'altend=EXCLUDED.altend altstart=EXCLUDED.altstart '
-        'latend=EXCLUDED.latend latstart=EXCLUDED.latstart '
-        'lonend=EXCLUDED.lonend lonstart=EXCLUDED.lonstart '
-        'mjdend=EXCLUDED.mjdend mjdstart=EXCLUDED.mjdstart '
-        'numpec=EXCLUDED.numspec '
-        'sunzd=EXCLUDED.sunzd '
-        'datetime=EXCLUDED.datetime '
-        'created=EXCLUDED.created '
+        'altend=EXCLUDED.altend, altstart=EXCLUDED.altstart, '
+        'latend=EXCLUDED.latend, latstart=EXCLUDED.latstart, '
+        'lonend=EXCLUDED.lonend, lonstart=EXCLUDED.lonstart, '
+        'mjdend=EXCLUDED.mjdend, mjdstart=EXCLUDED.mjdstart, '
+        'numspec=EXCLUDED.numspec, '
+        'sunzd=EXCLUDED.sunzd, '
+        'datetime=EXCLUDED.datetime, '
+        'created=EXCLUDED.created, '
         'quality=EXCLUDED.quality ',
         (
             day,
@@ -73,8 +73,8 @@ def get_odin_data(
     endpoint: str,
     api_base: str = API_BASE,
     max_retries: int = MAX_RETRIES,
-):
-    url = f"{api_base}/{endpoint}/"
+) -> dict:
+    url = f"{api_base}/{endpoint}"
     response = requests.get(url, timeout=60)
     retries = max_retries
     while retries > 0:
@@ -94,7 +94,7 @@ def get_odin_data(
 def update_scans(
     db_connection,
     date_info: dict[str, list[dict[str, Any]]]
-):
+) -> dict:
     """Populate database with 'cached' scans for each day.
     """
 
@@ -133,7 +133,7 @@ def update_scans(
     return all_scans
 
 
-def handler(event: dict[str, Any], context: Any):
+def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     pg_credentials = get_parameters(
         [
             "/odin/psql/user",
@@ -167,7 +167,7 @@ def handler(event: dict[str, Any], context: Any):
             "ScanID": data["ScanID"],
         }
         for scan, data in scans.items()
-        if scan in event["scans"]
+        if scan in event["Scans"]
     }
     return {
         "StatusCode": 200,
