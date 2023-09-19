@@ -1,10 +1,11 @@
 import datetime as dt
 from time import sleep
+from tempfile import TemporaryDirectory
 from typing import Any
 
 import requests
 
-from .odin_connection import odin_connection
+from .odin_connection import odin_connection, setup_postgres
 from .ssm_parameters import get_parameters
 
 
@@ -141,11 +142,17 @@ def handler(event: dict[str, Any], context: Any):
             "/odin/psql/password",
         ]
     )
-    db_connection = odin_connection(pg_credentials)
 
-    scans = update_scans(db_connection, event["DateInfo"])
+    with TemporaryDirectory(
+        "psql",
+        "/tmp/",
+    ) as psql_dir:
+        setup_postgres(psql_dir)
+        db_connection = odin_connection(pg_credentials)
 
-    db_connection.close()
+        scans = update_scans(db_connection, event["DateInfo"])
+
+        db_connection.close()
 
     scans = {
         scan: {

@@ -1,7 +1,8 @@
 import datetime as dt
+from tempfile import TemporaryDirectory
 from typing import Any
 
-from .odin_connection import odin_connection
+from .odin_connection import odin_connection, setup_postgres
 from .ssm_parameters import get_parameters
 from .time_util import datetime2mjd, mjd2stw, stw2datetime
 
@@ -108,12 +109,18 @@ def handler(event: dict[str, list[int]], context: Any):
             "/odin/psql/password",
         ]
     )
-    db_connection = odin_connection(pg_credentials)
 
-    dates = [stw2datetime(scan_id) for scan_id in event["scans"]]
-    date_info = update_measurements(db_connection, min(dates), max(dates))
+    with TemporaryDirectory(
+        "psql",
+        "/tmp/",
+    ) as psql_dir:
+        setup_postgres(psql_dir)
+        db_connection = odin_connection(pg_credentials)
 
-    db_connection.close()
+        dates = [stw2datetime(scan_id) for scan_id in event["scans"]]
+        date_info = update_measurements(db_connection, min(dates), max(dates))
+
+        db_connection.close()
 
     return {
         "StatusCode": 200,
