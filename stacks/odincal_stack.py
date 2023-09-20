@@ -239,6 +239,12 @@ class OdincalStack(Stack):
             result_path="$.JobInfo",
         )
         job_info_level1_task.add_retry(
+            errors=["Level1BPrepareDataError"],
+            max_attempts=4,
+            backoff_rate=2,
+            interval=Duration.minutes(10),
+        )
+        job_info_level1_task.add_retry(
             errors=["States.ALL"],
             max_attempts=4,
             backoff_rate=2,
@@ -305,6 +311,12 @@ class OdincalStack(Stack):
                 },
             ),
             result_path="$.ScansInfo",
+        )
+        scans_info_task.add_retry(
+            errors=["RetriesExhaustedError"],
+            max_attempts=4,
+            backoff_rate=2,
+            interval=Duration.minutes(10),
         )
         scans_info_task.add_retry(
             errors=["States.ALL"],
@@ -456,14 +468,14 @@ class OdincalStack(Stack):
 
         check_activate_level2_status_state.when(
             sfn.Condition.number_equals(
-                "$.AtcivateLevel2.Payload.StatusCode",
+                "$.ActivateLevel2.Payload.StatusCode",
                 200,
             ),
             activate_level2_success_state,
         )
         check_activate_level2_status_state.when(
             sfn.Condition.number_equals(
-                "$.AtcivateLevel2.Payload.StatusCode",
+                "$.ActivateLevel2.Payload.StatusCode",
                 404,
             ),
             activate_level2_not_found_state,
