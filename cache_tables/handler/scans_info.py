@@ -94,11 +94,11 @@ def get_odin_data(
 def update_scans(
     pg_credentials,
     date_info: dict[str, list[dict[str, Any]]]
-) -> dict:
+) -> list[dict[str, Any]]:
     """Populate database with 'cached' scans for each day.
     """
 
-    all_scans = dict()
+    all_scans = []
     for date_str, info in date_info.items():
         for freqmode_info in info:
             freqmode = freqmode_info["FreqMode"]
@@ -131,7 +131,7 @@ def update_scans(
                     scan["SunZD"],
                     scan["Quality"],
                 )
-                all_scans[scan["ScanID"]] = scan
+                all_scans.append(scan)
 
             db_connection.commit()
             db_cursor.close()
@@ -158,21 +158,21 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         scans = update_scans(pg_credentials, event["DateInfo"])
 
-    scans = {
-        scan: {
-            "AltStart": data["AltStart"],
-            "AltEnd": data["AltEnd"],
-            "LatStart": data["LatStart"],
-            "LatEnd": data["LatEnd"],
-            "LonStart": data["LonStart"],
-            "LonEnd": data["LonEnd"],
-            "MJDStart": data["MJDStart"],
-            "MJDEnd": data["MJDEnd"],
-            "ScanID": data["ScanID"],
+    scans = [
+        {
+            "AltStart": scan["AltStart"],
+            "AltEnd": scan["AltEnd"],
+            "LatStart": scan["LatStart"],
+            "LatEnd": scan["LatEnd"],
+            "LonStart": scan["LonStart"],
+            "LonEnd": scan["LonEnd"],
+            "MJDStart": scan["MJDStart"],
+            "MJDEnd": scan["MJDEnd"],
+            "ScanID": scan["ScanID"],
         }
-        for scan, data in scans.items()
-        if scan in event["Scans"]
-    }
+        for scan in scans
+        if scan["ScanID"] in event["Scans"]
+    ]
     return {
         "StatusCode": 200,
         "ScansInfo": scans,
