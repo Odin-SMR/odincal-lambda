@@ -388,11 +388,16 @@ class OdincalStack(Stack):
         activate_level2_fail_state = sfn.Fail(
             self,
             "OdinSMRActivateL2Fail",
-            comment="Somthing went wrong when calling Level2 processing",
+            comment="Somthing went wrong when calling Level 2 processing",
         )
         activate_level2_success_state = sfn.Succeed(
             self,
             "OdinSMRActivateLevel2Success",
+        )
+        activate_level2_not_found_state = sfn.Succeed(
+            self,
+            "OdinSMRActivateLevel2Found",
+            comment="State machine for Level 2 not found",
         )
         check_activate_level2_status_state = sfn.Choice(
             self,
@@ -455,6 +460,13 @@ class OdincalStack(Stack):
                 200,
             ),
             activate_level2_success_state,
+        )
+        check_activate_level2_status_state.when(
+            sfn.Condition.number_equals(
+                "$.AtcivateLevel2.Payload.StatusCode",
+                404,
+            ),
+            activate_level2_not_found_state,
         )
         check_activate_level2_status_state.otherwise(activate_level2_fail_state)
         activate_level2_task.next(check_activate_level2_status_state)

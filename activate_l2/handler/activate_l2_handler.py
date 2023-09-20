@@ -41,7 +41,12 @@ def create_short_hash() -> str:
 
 def activate_l2_handler(event: Event, context: Context) -> dict[str, int]:
 
-    state_machine_arn = find_arn()
+    try:
+        state_machine_arn = find_arn()
+    except StateMachineError:
+        return {
+            "StatusCode": 404,
+        }
 
     sfn = boto3.client("stepfunctions")
     filename = os.path.split(event["File"])[-1]
