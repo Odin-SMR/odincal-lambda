@@ -92,21 +92,25 @@ def get_odin_data(
 
 
 def update_scans(
-    db_connection,
+    pg_credentials,
     date_info: dict[str, list[dict[str, Any]]]
 ) -> dict:
     """Populate database with 'cached' scans for each day.
     """
 
-    db_cursor = db_connection.cursor()
     all_scans = dict()
     for date_str, info in date_info.items():
         for freqmode_info in info:
             freqmode = freqmode_info["FreqMode"]
             if freqmode == 0:
                 continue
+
             scans_api = f"rest_api/v5/freqmode_raw/{date_str}/{freqmode}/"
             scan_data = get_odin_data(scans_api)
+
+            db_connection = odin_connection(pg_credentials)
+            db_cursor = db_connection.cursor()
+
             for scan in scan_data["Data"]:
                 add_to_database(
                     db_cursor,
@@ -128,8 +132,11 @@ def update_scans(
                     scan["Quality"],
                 )
                 all_scans[scan["ScanID"]] = scan
+
             db_connection.commit()
-    db_cursor.close()
+            db_cursor.close()
+            db_connection.close()
+
     return all_scans
 
 
@@ -148,11 +155,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         "/tmp/",
     ) as psql_dir:
         setup_postgres(psql_dir)
-        db_connection = odin_connection(pg_credentials)
 
-        scans = update_scans(db_connection, event["DateInfo"])
-
-        db_connection.close()
+        scans = update_scans(pg_credentials, event["DateInfo"])
 
     scans = {
         scan: {

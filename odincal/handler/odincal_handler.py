@@ -61,16 +61,24 @@ def get_env_or_raise(variable_name):
 
 
 def assert_has_attitude_coverage(
-    ac_file, backend, version, con, buffer=ATT_BUFFER,
+    ac_file,
+    backend,
+    version,
+    pg_string,
+    buffer=ATT_BUFFER,
 ):
+    con = DB(pg_string)
+
     prepare = PrepareData(ac_file, backend, version, con)
     ac_stw_start, ac_stw_end = prepare.get_stw_from_acfile()
 
     query = con.query(
         "select max(stw) as latest_att_stw from attitude_level0;"
     )
-
     result = query.dictresult()
+
+    con.close()
+
     if result[0]["latest_att_stw"] - ac_stw_end < buffer:
         msg = "attitude data with STW {0} not recent enough for {1} with STW {2} to {3} (buffer required: {4})".format(  # noqa
             result[0]["latest_att_stw"],
@@ -167,15 +175,19 @@ def preprocess_handler(event, context):
     backend = event["backend"].upper()
 
     pg_string = setup_postgres()
-    con = DB(pg_string)
 
-    assert_has_attitude_coverage(ac_file, backend, version, con)
+    assert_has_attitude_coverage(
+        ac_file,
+        backend,
+        version,
+        pg_string,
+    )
+
     stw1, stw2 = preprocess_level1b(
         ac_file,
         backend,
         version,
-        con,
-        pg_string,
+        pg_string=pg_string,
     )
 
     return {
@@ -195,7 +207,6 @@ def get_job_info_handler(event, context):
     stw2 = event["STW2"]
 
     pg_string = setup_postgres()
-    con = DB(pg_string)
 
     scan_starts, soda_version = job_info_level1b(
         stw1,
@@ -203,8 +214,7 @@ def get_job_info_handler(event, context):
         ac_file,
         backend,
         version,
-        con,
-        pg_string,
+        pg_string=pg_string,
     )
 
     return {
@@ -224,7 +234,6 @@ def import_handler(event, context):
     scan_starts = event["ScanStarts"]
 
     pg_string = setup_postgres()
-    con = DB(pg_string)
 
     scans = import_level1b(
         scan_starts,
@@ -232,10 +241,9 @@ def import_handler(event, context):
         ac_file,
         backend,
         version,
-        con,
-        pg_string,
+        pg_string=pg_string,
     )
-
+    
     return {
         "StatusCode": 200,
         "Scans": scans,

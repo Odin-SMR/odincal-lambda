@@ -1,8 +1,8 @@
 from sys import argv
-import datetime
 import copy
 import logging
 import numpy
+from pg import DB
 from oops import odin  # pylint: disable=import-error
 from odincal.calibration_preprocess import PrepareData, filter_data, NoScansError
 from odincal.database import ConfiguredDatabase
@@ -266,12 +266,21 @@ class Level1BPreprocessDataError(Level1BImportError):
     pass
 
 
-def preprocess_level1b(acfile, backend, version, con, pg_string=None):
+def preprocess_level1b(
+    acfile,
+    backend,
+    version,
+    con=None,
+    pg_string=None,
+):
     '''perform preprocessing'''
 
     logging.basicConfig()
     logger = logging.getLogger('level1b pre-process')
     logger.info('pre-processing file {0}'.format(acfile))
+
+    if con is None:
+        con = DB(pg_string)
 
     prepare_data = PrepareData(acfile, backend, version, con, pg_string)
 
@@ -295,6 +304,8 @@ def preprocess_level1b(acfile, backend, version, con, pg_string=None):
         msg = 'could not preprocess data for processing file {0}'.format(acfile)  # noqa
         raise Level1BPreprocessDataError(msg)
 
+    con.close()
+
     return stw1, stw2
 
 
@@ -304,12 +315,15 @@ def job_info_level1b(
     acfile,
     backend,
     version,
-    con,
+    con=None,
     pg_string=None,
 ):
     logging.basicConfig()
     logger = logging.getLogger('level1b get job batch info')
     logger.info('getting job batch info for file {0}'.format(acfile))
+
+    if con is None:
+        con = DB(pg_string)
 
     prepare_data = PrepareData(acfile, backend, version, con, pg_string)
 
@@ -330,6 +344,8 @@ def job_info_level1b(
     # get data to be used in calibration
     sodaversion = prepare_data.get_soda_version(stw1, stw2)
 
+    con.close()
+
     return scanstarts, sodaversion
 
 
@@ -339,8 +355,8 @@ def import_level1b(
     acfile,
     backend,
     version,
-    con,
-    pg_string,
+    con=None,
+    pg_string=None,
 ):
     '''intensity and frequency calibration'''
 
@@ -350,6 +366,10 @@ def import_level1b(
 
     firstscan = scanstarts[0]['start']
     lastscan = scanstarts[len(scanstarts) - 1]['start']
+
+    if con is None:
+        con = DB(pg_string)
+
     prepare_data = PrepareData(acfile, backend, version, con, pg_string)
     try:
         result = prepare_data.get_data_for_calibration(
@@ -405,6 +425,7 @@ def import_level1b(
         scan_ids.append(row["start"])
         success_scans = success_scans + 1
 
+
     info = {
         'info': '',
         'total_scans': len(scanstarts),
@@ -412,11 +433,19 @@ def import_level1b(
         'version': version,
     }
     report_result(con, acfile, info)
+
     con.close()
+
     return scan_ids
 
 
-def level1b_importer(acfile, backend, version, con, pg_string=None):
+def level1b_importer(
+    acfile,
+    backend,
+    version,
+    con=None,
+    pg_string=None,
+):
     '''perform preprocessing, and intensity and frequency calibration'''
 
     stw1, stw2 = preprocess_level1b(

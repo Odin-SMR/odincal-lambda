@@ -62,7 +62,7 @@ def add_to_database(
 
 
 def update_measurements(
-    db_connection,
+    pg_credentials,
     start_date: dt.date,
     end_date: dt.date | None = None,
 ) -> dict[str, list]:
@@ -77,10 +77,13 @@ def update_measurements(
         current_date = end_date
     earliest_date = start_date
 
-    db_cursor = db_connection.cursor(cursor_factory=RealDictCursor)
     freqmode_info: dict[str, list] = dict()
     while current_date >= earliest_date:
+        db_connection = odin_connection(pg_credentials)
+        db_cursor = db_connection.cursor(cursor_factory=RealDictCursor)
+
         date_info = get_date_info(db_cursor, current_date)
+
         freqmode_info[current_date.isoformat()] = []
         for freqmode in date_info:
             add_to_database(
@@ -97,9 +100,13 @@ def update_measurements(
                     "NumScan": freqmode["NumScan"],
                 }
             )
+
         db_connection.commit()
+        db_cursor.close()
+        db_connection.close()
+
         current_date = current_date + step
-    db_cursor.close()
+
     return freqmode_info
 
 
@@ -118,12 +125,9 @@ def handler(event: dict[str, list[int]], context: Any) -> dict[str, Any]:
         "/tmp/",
     ) as psql_dir:
         setup_postgres(psql_dir)
-        db_connection = odin_connection(pg_credentials)
 
         dates = [stw2datetime(scan_id).date() for scan_id in event["Scans"]]
-        date_info = update_measurements(db_connection, min(dates), max(dates))
-
-        db_connection.close()
+        date_info = update_measurements(pg_credentials, min(dates), max(dates))
 
     return {
         "StatusCode": 200,
