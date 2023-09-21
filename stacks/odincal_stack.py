@@ -282,9 +282,10 @@ class OdincalStack(Stack):
             lambda_function=date_info_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "Scans": sfn.JsonPath.string_at(
+                    "Scans": sfn.JsonPath.list_at(
                         "$.CalibrateLevel1.Payload.Scans"
                     ),
+                    "File": sfn.JsonPath.string_at("$.name"),
                 },
             ),
             result_path="$.DateInfo",
@@ -300,16 +301,6 @@ class OdincalStack(Stack):
             self,
             "OdinSMROdincalScansInfoTask",
             lambda_function=scans_info_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "DateInfo": sfn.JsonPath.list_at(
-                        "$.DateInfo.Payload.DateInfo"
-                    ),
-                    "Scans": sfn.JsonPath.string_at(
-                        "$.CalibrateLevel1.Payload.Scans"
-                    ),
-                },
-            ),
             result_path="$.ScansInfo",
         )
         scans_info_task.add_retry(
@@ -331,10 +322,10 @@ class OdincalStack(Stack):
             lambda_function=activate_level2_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "Scans": sfn.JsonPath.list_at(
+                    "ScansData": sfn.JsonPath.list_at(
                         "$.ScansInfo.Payload.ScansInfo"
                     ),
-                    "File": sfn.JsonPath.string_at("$.name"),
+                    "File": sfn.JsonPath.string_at("$.File"),
                 },
             ),
             result_path="$.ActivateLevel2",
@@ -392,6 +383,11 @@ class OdincalStack(Stack):
             "OdinSMRScansInfoFail",
             comment="Somthing went wrong when updating Scans Info tables",
         )
+        scans_info_no_work_state = sfn.Succeed(
+            self,
+            "OdinSMRScansInfoNoScans",
+            comment="No scans for freqmode, so nothing to do (e.g. FM  0)",
+        )
         check_scans_info_status_state = sfn.Choice(
             self,
             "OdinSMRCheckScansInfoStatus",
@@ -408,7 +404,7 @@ class OdincalStack(Stack):
         )
         activate_level2_not_found_state = sfn.Succeed(
             self,
-            "OdinSMRActivateLevel2Found",
+            "OdinSMRActivateLevel2NotFound",
             comment="State machine for Level 2 not found",
         )
         check_activate_level2_status_state = sfn.Choice(
@@ -446,12 +442,18 @@ class OdincalStack(Stack):
         check_calibrate_status_state.otherwise(calibrate_level1_fail_state)
         calibrate_level1_task.next(check_calibrate_status_state)
 
+        map_scans_info = sfn.Map(
+            self,
+            "OdinSMROdincalMapScansInfo",
+            max_concurrency=1,
+            items_path="$.DateInfo.Payload.DateInfo",
+        )
         check_date_info_status_state.when(
             sfn.Condition.number_equals(
                 "$.DateInfo.Payload.StatusCode",
                 200,
             ),
-            scans_info_task,
+            map_scans_info.iterator(scans_info_task),
         )
         check_date_info_status_state.otherwise(date_info_fail_state)
         date_info_task.next(check_date_info_status_state)
@@ -462,6 +464,13 @@ class OdincalStack(Stack):
                 200,
             ),
             activate_level2_task,
+        )
+        check_scans_info_status_state.when(
+            sfn.Condition.number_equals(
+                "$.ScansInfo.Payload.StatusCode",
+                204,
+            ),
+            scans_info_no_work_state,
         )
         check_scans_info_status_state.otherwise(scans_info_fail_state)
         scans_info_task.next(check_scans_info_status_state)

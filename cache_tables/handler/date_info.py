@@ -65,7 +65,7 @@ def update_measurements(
     pg_credentials,
     start_date: dt.date,
     end_date: dt.date | None = None,
-) -> dict[str, list]:
+) -> list[dict[str, Any]]:
     """Populate database with 'cached' stats for measurements each day.
 
     Walks backwards from end_date to start_date, but typically run for one day.
@@ -77,14 +77,13 @@ def update_measurements(
         current_date = end_date
     earliest_date = start_date
 
-    freqmode_info: dict[str, list] = dict()
+    freqmode_info = []
     while current_date >= earliest_date:
         db_connection = odin_connection(pg_credentials)
         db_cursor = db_connection.cursor(cursor_factory=RealDictCursor)
 
         date_info = get_date_info(db_cursor, current_date)
 
-        freqmode_info[current_date.isoformat()] = []
         for freqmode in date_info:
             add_to_database(
                 db_cursor,
@@ -93,8 +92,9 @@ def update_measurements(
                 freqmode['NumScan'],
                 freqmode['Backend'],
             )
-            freqmode_info[current_date.isoformat()].append(
+            freqmode_info.append(
                 {
+                    "DateString": current_date.isoformat(),
                     "FreqMode": freqmode["FreqMode"],
                     "Backend": freqmode["Backend"],
                     "NumScan": freqmode["NumScan"],
@@ -128,6 +128,10 @@ def handler(event: dict[str, list[int]], context: Any) -> dict[str, Any]:
 
         dates = [stw2datetime(scan_id).date() for scan_id in event["Scans"]]
         date_info = update_measurements(pg_credentials, min(dates), max(dates))
+
+    for idx in range(len(date_info)):
+        date_info[idx]["Scans"] = event["Scans"]
+        date_info[idx]["File"] = event["File"]
 
     return {
         "StatusCode": 200,
