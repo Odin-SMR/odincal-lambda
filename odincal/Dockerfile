@@ -24,4 +24,4 @@ RUN pip install /odincal --target "${LAMBDA_TASK_ROOT}"
 
 # Setup handler
 COPY ./handler ${LAMBDA_TASK_ROOT}/handler
-CMD [ "handler.odincal_handler.handler" ]
+CMD [ "handler.odincal_handler.import_handler" ]

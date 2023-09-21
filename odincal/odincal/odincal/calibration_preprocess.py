@@ -11,6 +11,14 @@ GALAX1 = 0x0004
 SUN1 = 0x0008
 
 
+class NoScansError(Exception):
+    pass
+
+
+class BadBack(Exception):
+    pass
+
+
 class PrepareData(object):
     '''prepare level0 database data for calibration'''
 
@@ -22,22 +30,19 @@ class PrepareData(object):
         self.version = version
 
     def get_stw_from_acfile(self):
-        query = self.con.query(
-            '''select min(stw),max(stw)
-               from ac_level0 where file='{0}'
-            '''.format(self.acfile)
-        )
+        query_str = "select min(stw),max(stw) from ac_level0 where file='{0}'".format(self.acfile)  # noqa
+        query = self.con.query(query_str)
         result = query.dictresult()
         if result[0]['max'] is None:
             # no data from file imported in ac_level0 table
-            return -1, -1
+            raise NoScansError(query_str)
         return result[0]['min'], result[0]['max']
 
     def get_soda_version(self, stw1, stw2):
         query = self.con.query(
             '''select soda from attitude_level0
                where stw>{0} and stw<{1} group by soda
-            '''.format(*[stw1, stw2])
+            '''.format(stw1, stw2)
         )
         result = query.dictresult()
         if result == []:
@@ -57,7 +62,7 @@ class PrepareData(object):
     def get_scan_starts(self, stw1, stw2):
         temp = [stw1, stw2]
         if self.backend == 'AC1':
-            query = self.con.query(
+            query_str = (
                 '''select start,ssb_att from ac_level0
                    natural join getscansac1({0},{1})
                    join shk_level1 using(stw,backend)
@@ -66,9 +71,10 @@ class PrepareData(object):
                    order by start
                 '''.format(*temp)
             )
+            query = self.con.query(query_str)
 
-        else:
-            query = self.con.query(
+        elif self.backend == 'AC2':
+            query_str = (
                 '''select start,ssb_att from ac_level0
                    natural join getscansac2({0},{1})
                    join shk_level1 using(stw,backend)
@@ -77,14 +83,19 @@ class PrepareData(object):
                    order by start
                 '''.format(*temp)
             )
-        return query.dictresult()
+            query = self.con.query(query_str)
+        else:
+            raise BadBack("Unknown backend {0}".format(self.backend))
+        results = query.dictresult()
+        if results == []:
+            raise NoScansError(query_str)
+        return results
 
     def get_data_for_calibration(
             self, stw1, stw2, tdiff, sodaversion):
         temp = [stw1 - tdiff, stw2 + tdiff, sodaversion]
         if self.backend == 'AC1':
-
-            query = self.con.query(
+            query_str = (
                 '''(
                    select ac_level0.stw,start,ssb_att,skybeamhit,cc,
                    ac_level0.backend,
@@ -104,10 +115,9 @@ class PrepareData(object):
                    order by stw
                 )'''.format(*temp)
             )
-
-        if self.backend == 'AC2':
-
-            query = self.con.query(
+            query = self.con.query(query_str)
+        elif self.backend == 'AC2':
+            query_str = (
                 '''(
                    select ac_level0.stw,start,ssb_att,skybeamhit,cc,
                    ac_level0.backend,
@@ -127,8 +137,14 @@ class PrepareData(object):
                    order by stw
                 )'''.format(*temp)
             )
+            query = self.con.query(query_str)
+        else:
+            raise BadBack("Unknown backend {0}".format(self.backend))
 
-        return query.dictresult()
+        results = query.dictresult()
+        if results == []:
+            raise NoScansError(query_str)
+        return results
 
 
 def filter_data(result, start, ssb_att, scanfrontend, tdiff):

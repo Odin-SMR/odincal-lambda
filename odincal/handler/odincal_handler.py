@@ -7,7 +7,11 @@ import boto3
 from pg import DB
 
 from odincal.calibration_preprocess import PrepareData
-from odincal.level1b_window_importer2 import level1b_importer
+from odincal.level1b_window_importer2 import (
+    preprocess_level1b,
+    job_info_level1b,
+    import_level1b,
+)
 
 
 ATT_BUFFER = 16 * 60 * 60 * 24 * 5  # Five day buffer
@@ -57,16 +61,24 @@ def get_env_or_raise(variable_name):
 
 
 def assert_has_attitude_coverage(
-    ac_file, backend, version, con, buffer=ATT_BUFFER,
+    ac_file,
+    backend,
+    version,
+    pg_string,
+    buffer=ATT_BUFFER,
 ):
+    con = DB(pg_string)
+
     prepare = PrepareData(ac_file, backend, version, con)
     ac_stw_start, ac_stw_end = prepare.get_stw_from_acfile()
 
     query = con.query(
         "select max(stw) as latest_att_stw from attitude_level0;"
     )
-
     result = query.dictresult()
+
+    con.close()
+
     if result[0]["latest_att_stw"] - ac_stw_end < buffer:
         msg = "attitude data with STW {0} not recent enough for {1} with STW {2} to {3} (buffer required: {4})".format(  # noqa
             result[0]["latest_att_stw"],
@@ -97,16 +109,12 @@ def notify_queue(
         raise NotifyFailed(msg)
 
 
-def handler(event, context):
+def setup_postgres():
     pg_host_ssm_name = get_env_or_raise("ODIN_PG_HOST_SSM_NAME")
     pg_user_ssm_name = get_env_or_raise("ODIN_PG_USER_SSM_NAME")
     pg_pass_ssm_name = get_env_or_raise("ODIN_PG_PASS_SSM_NAME")
     pg_db_ssm_name = get_env_or_raise("ODIN_PG_DB_SSM_NAME")
     psql_bucket = get_env_or_raise("ODIN_PSQL_BUCKET_NAME")
-    notification_queue = get_env_or_raise("ODIN_L1_NOTIFICATIONS")
-    version = ODINCAL_VERSION
-    ac_file = os.path.split(event["acFile"])[-1]
-    backend = event["backend"].upper()
 
     psql_dir = mkdtemp()
     s3_client = boto3.client('s3')
@@ -152,26 +160,93 @@ def handler(event, context):
         Name=pg_db_ssm_name,
         WithDecryption=True,
     )["Parameter"]["Value"]
-    
-    pg_string = "host={0} user={1} password={2} dbname={3} sslmode=verify-ca".format(  # noqa: E501
+
+    return "host={0} user={1} password={2} dbname={3} sslmode=verify-ca".format(  # noqa: E501
         db_host,
         db_user,
         db_pass,
         db_name,
     )
-    con = DB(pg_string)
-    assert_has_attitude_coverage(ac_file, backend, version, con)
-    scans = level1b_importer(ac_file, backend, version, con, pg_string)
 
-    sqs_client = boto3.client("sqs")
-    notify_queue(
-        sqs_client,
-        notification_queue,
-        scans,
+
+def preprocess_handler(event, context):
+    version = ODINCAL_VERSION
+    ac_file = os.path.split(event["acFile"])[-1]
+    backend = event["backend"].upper()
+
+    pg_string = setup_postgres()
+
+    assert_has_attitude_coverage(
+        ac_file,
+        backend,
+        version,
+        pg_string,
     )
+
+    stw1, stw2 = preprocess_level1b(
+        ac_file,
+        backend,
+        version,
+        pg_string=pg_string,
+    )
+
     return {
-        "success": True,
-        "scans": len(scans),
-        "backend": backend,
-        "file": ac_file,
+        "StatusCode": 200,
+        "STW1": stw1,
+        "STW2": stw2,
+        "Backend": backend,
+        "File": ac_file,
+    }
+
+
+def get_job_info_handler(event, context):
+    version = ODINCAL_VERSION
+    ac_file = os.path.split(event["acFile"])[-1]
+    backend = event["backend"].upper()
+    stw1 = event["STW1"]
+    stw2 = event["STW2"]
+
+    pg_string = setup_postgres()
+
+    scan_starts, soda_version = job_info_level1b(
+        stw1,
+        stw2,
+        ac_file,
+        backend,
+        version,
+        pg_string=pg_string,
+    )
+
+    return {
+        "StatusCode": 200,
+        "ScanStarts": scan_starts,
+        "SodaVersion": soda_version,
+        "Backend": backend,
+        "File": ac_file,
+    }
+
+
+def import_handler(event, context):
+    version = ODINCAL_VERSION
+    ac_file = os.path.split(event["acFile"])[-1]
+    backend = event["backend"].upper()
+    soda_version = event["SodaVersion"]
+    scan_starts = event["ScanStarts"]
+
+    pg_string = setup_postgres()
+
+    scans = import_level1b(
+        scan_starts,
+        soda_version,
+        ac_file,
+        backend,
+        version,
+        pg_string=pg_string,
+    )
+    
+    return {
+        "StatusCode": 200,
+        "Scans": scans,
+        "Backend": backend,
+        "File": ac_file,
     }

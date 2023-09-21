@@ -1,13 +1,16 @@
 from sys import argv
-import datetime
 import copy
 import logging
 import numpy
+from pg import DB
 from oops import odin  # pylint: disable=import-error
-from odincal.calibration_preprocess import PrepareData, filter_data
+from odincal.calibration_preprocess import PrepareData, filter_data, NoScansError
 from odincal.database import ConfiguredDatabase
 from odincal.frequency_calibration import Spectra
 from odincal.intensity_calibration import calibrate
+
+
+TDIFF = 45 * 60 * 16
 
 
 def frequency_calibrate(listof_uncal_spec, con):
@@ -90,7 +93,6 @@ def insert_spec_in_db(con, calibrated, calstw, soda, version, tspill):
     '''store data into database tables
         ac_level1b (spectra) or ac_cal_level1b (tsys and ssb)
     '''
-    print datetime.datetime.now()
     for spec in calibrated:
         specs = []
         if spec.split:
@@ -264,57 +266,124 @@ class Level1BPreprocessDataError(Level1BImportError):
     pass
 
 
-def level1b_importer(acfile, backend, version, con, pg_string=None):
-    '''perform an intensity and frequency calibration'''
+def preprocess_level1b(
+    acfile,
+    backend,
+    version,
+    con=None,
+    pg_string=None,
+):
+    '''perform preprocessing'''
+
+    logging.basicConfig()
+    logger = logging.getLogger('level1b pre-process')
+    logger.info('pre-processing file {0}'.format(acfile))
+
+    if con is None:
+        con = DB(pg_string)
+
+    prepare_data = PrepareData(acfile, backend, version, con, pg_string)
+
+    # find out max and min stw from acfile to calibrate
+    try:
+        stw1, stw2 = prepare_data.get_stw_from_acfile()
+    except NoScansError as err:
+        info = {
+            'info': 'no ac data',
+            'total_scans': 0,
+            'success_scans': 0,
+            'version': version,
+        }
+        report_result(con, acfile, info)
+        msg = 'no imported level0 ac data found for processing file {0} ({1})'.format(acfile, err)  # noqa
+        raise Level1BPrepareDataError(msg)
+
+    error = preprocess_data(
+        acfile, backend, version, con, stw1, stw2, TDIFF, logger, pg_string)
+    if error:
+        msg = 'could not preprocess data for processing file {0}'.format(acfile)  # noqa
+        raise Level1BPreprocessDataError(msg)
+
+    con.close()
+
+    return stw1, stw2
+
+
+def job_info_level1b(
+    stw1,
+    stw2,
+    acfile,
+    backend,
+    version,
+    con=None,
+    pg_string=None,
+):
+    logging.basicConfig()
+    logger = logging.getLogger('level1b get job batch info')
+    logger.info('getting job batch info for file {0}'.format(acfile))
+
+    if con is None:
+        con = DB(pg_string)
+
+    prepare_data = PrepareData(acfile, backend, version, con, pg_string)
+
+    # find out which scan that starts in the file to calibrate
+    try:
+        scanstarts = prepare_data.get_scan_starts(stw1, stw2)
+    except NoScansError as err:
+        info = {
+            'info': 'no scans found in file',
+            'total_scans': 0,
+            'success_scans': 0,
+            'version': version,
+        }
+        report_result(con, acfile, info)
+        msg = 'no scans found for processing file {0} ({1})'.format(acfile, err)  # noqa
+        raise Level1BPrepareDataError(msg)
+
+    # get data to be used in calibration
+    sodaversion = prepare_data.get_soda_version(stw1, stw2)
+
+    con.close()
+
+    return scanstarts, sodaversion
+
+
+def import_level1b(
+    scanstarts,
+    sodaversion,
+    acfile,
+    backend,
+    version,
+    con=None,
+    pg_string=None,
+):
+    '''intensity and frequency calibration'''
 
     logging.basicConfig()
     logger = logging.getLogger('level1b process')
     logger.info('processing file {0}'.format(acfile))
 
-    prepare_data = PrepareData(acfile, backend, version, con, pg_string)
-
-    # find out max and min stw from acfile to calibrate
-    stw1, stw2 = prepare_data.get_stw_from_acfile()
-    if stw1 == -1:
-        info = {'info': 'no ac data',
-                'total_scans': 0,
-                'success_scans': 0,
-                'version': version}
-        report_result(con, acfile, info)
-        msg = 'no imported level0 ac data found for processing file {0}'.format(acfile)  # noqa
-        raise Level1BPrepareDataError(msg)
-
-    tdiff = 45 * 60 * 16
-    error = preprocess_data(
-        acfile, backend, version, con, stw1, stw2, tdiff, logger, pg_string)
-    if error:
-        msg = 'could not preprocess data for processing file {0}'.format(acfile)  # noqa
-        raise Level1BPreprocessDataError(msg)
-
-    # find out which scan that starts in the file to calibrate
-    scanstarts = prepare_data.get_scan_starts(stw1, stw2)
-    if scanstarts == []:
-        info = {'info': 'no scans found in file',
-                'total_scans': 0,
-                'success_scans': 0,
-                'version': version}
-        report_result(con, acfile, info)
-        msg = 'no scans found for processing file {0}'.format(acfile)  # noqa
-        raise Level1BPrepareDataError(msg)
-
-    # get data to be used in calibration
-    sodaversion = prepare_data.get_soda_version(stw1, stw2)
     firstscan = scanstarts[0]['start']
     lastscan = scanstarts[len(scanstarts) - 1]['start']
-    result = prepare_data.get_data_for_calibration(
-        firstscan, lastscan, tdiff, sodaversion)
-    if result == []:
-        info = {'info': 'necessary data not available',
-                'total_scans': 0,
-                'success_scans': 0,
-                'version': version}
+
+    if con is None:
+        con = DB(pg_string)
+
+    prepare_data = PrepareData(acfile, backend, version, con, pg_string)
+    try:
+        result = prepare_data.get_data_for_calibration(
+            firstscan, lastscan, TDIFF, sodaversion,
+        )
+    except NoScansError as err:
+        info = {
+            'info': 'necessary data not available',
+            'total_scans': 0,
+            'success_scans': 0,
+            'version': version,
+        }
         report_result(con, acfile, info)
-        msg = 'necessary data not available for processing file {0}'.format(acfile)  # noqa
+        msg = 'necessary data not available for processing file {0} ({1})'.format(acfile, err)  # noqa
         raise Level1BPrepareDataError(msg)
 
     # now loop over the scans
@@ -337,13 +406,12 @@ def level1b_importer(acfile, backend, version, con, pg_string=None):
                 row['start'],
                 row['ssb_att'],
                 scanfrontend,
-                tdiff
+                TDIFF,
             )
             # now we are ready to start to calibrate
             # spectra for a scan
             if scandata == []:
                 continue
-            print datetime.datetime.now()
             listofspec = frequency_calibrate(scandata, con)
             if listofspec == []:
                 continue
@@ -352,18 +420,59 @@ def level1b_importer(acfile, backend, version, con, pg_string=None):
                 con,
                 row['start'],
                 version,
-                sodaversion
+                sodaversion,
             )
         scan_ids.append(row["start"])
         success_scans = success_scans + 1
 
-    info = {'info': '',
-            'total_scans': len(scanstarts),
-            'success_scans': success_scans,
-            'version': version}
+
+    info = {
+        'info': '',
+        'total_scans': len(scanstarts),
+        'success_scans': success_scans,
+        'version': version,
+    }
     report_result(con, acfile, info)
+
     con.close()
+
     return scan_ids
+
+
+def level1b_importer(
+    acfile,
+    backend,
+    version,
+    con=None,
+    pg_string=None,
+):
+    '''perform preprocessing, and intensity and frequency calibration'''
+
+    stw1, stw2 = preprocess_level1b(
+        acfile,
+        backend,
+        version,
+        con,
+        pg_string,
+    )
+    scanstarts, sodaversion = job_info_level1b(
+        stw1,
+        stw2,
+        acfile,
+        backend,
+        version,
+        con,
+        pg_string,
+    )
+    return import_level1b(
+        scanstarts,
+        sodaversion,
+        acfile,
+        backend,
+        version,
+        con,
+        pg_string,
+    )
 
 
 def main():
