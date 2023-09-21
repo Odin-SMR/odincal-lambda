@@ -75,7 +75,7 @@ def get_odin_data(
     max_retries: int = MAX_RETRIES,
 ) -> dict:
     url = f"{api_base}/{endpoint}"
-    response = requests.get(url, timeout=90)
+    response = requests.get(url, timeout=365)
     retries = max_retries
     while retries > 0:
         try:
