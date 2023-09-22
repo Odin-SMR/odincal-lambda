@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 import requests
+from requests.exceptions import HTTPError, RequestException
 
 from .odin_connection import odin_connection, setup_postgres
 from .ssm_parameters import get_parameters
@@ -75,13 +76,13 @@ def get_odin_data(
     max_retries: int = MAX_RETRIES,
 ) -> dict:
     url = f"{api_base}/{endpoint}"
-    response = requests.get(url, timeout=365)
     retries = max_retries
     while retries > 0:
         try:
+            response = requests.get(url, timeout=365)
             response.raise_for_status()
             break
-        except requests.exceptions.HTTPError as msg:
+        except (HTTPError, RequestException) as msg:
             retries -= 1
             if retries == 0:
                 raise RetriesExhaustedError(
