@@ -1,5 +1,5 @@
 from aws_cdk import Duration, Stack
-from aws_cdk_lib import aws_stepfunctions as sfn
+from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from aws_cdk.aws_ec2 import Vpc, SubnetSelection, SubnetType
 from aws_cdk.aws_iam import Effect, PolicyStatement
