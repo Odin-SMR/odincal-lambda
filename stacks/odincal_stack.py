@@ -1,5 +1,5 @@
 from aws_cdk import Duration, Stack
-from aws_cdk import aws_stepfunctions as sfn
+from aws_cdk_lib import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from aws_cdk.aws_ec2 import Vpc, SubnetSelection, SubnetType
 from aws_cdk.aws_iam import Effect, PolicyStatement
@@ -215,9 +215,11 @@ class OdincalStack(Stack):
         )
         preprocess_level1_task.add_retry(
             errors=["States.ALL"],
-            max_attempts=4,
+            max_attempts=42,
             backoff_rate=2,
             interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
         )
 
         job_info_level1_task = tasks.LambdaInvoke(
@@ -240,15 +242,19 @@ class OdincalStack(Stack):
         )
         job_info_level1_task.add_retry(
             errors=["Level1BPrepareDataError"],
-            max_attempts=4,
+            max_attempts=42,
             backoff_rate=2,
             interval=Duration.minutes(12),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
         )
         job_info_level1_task.add_retry(
             errors=["States.ALL"],
-            max_attempts=4,
+            max_attempts=42,
             backoff_rate=2,
             interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
         )
 
         calibrate_level1_task = tasks.LambdaInvoke(
@@ -271,9 +277,11 @@ class OdincalStack(Stack):
         )
         calibrate_level1_task.add_retry(
             errors=["States.ALL"],
-            max_attempts=4,
+            max_attempts=42,
             backoff_rate=2,
             interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
         )
 
         date_info_task = tasks.LambdaInvoke(
@@ -292,9 +300,11 @@ class OdincalStack(Stack):
         )
         date_info_task.add_retry(
             errors=["States.ALL"],
-            max_attempts=4,
+            max_attempts=42,
             backoff_rate=2,
             interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
         )
 
         scans_info_task = tasks.LambdaInvoke(
@@ -305,15 +315,19 @@ class OdincalStack(Stack):
         )
         scans_info_task.add_retry(
             errors=["RetriesExhaustedError"],
-            max_attempts=4,
+            max_attempts=42,
             backoff_rate=2,
             interval=Duration.minutes(12),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
         )
         scans_info_task.add_retry(
             errors=["States.ALL"],
-            max_attempts=4,
+            max_attempts=42,
             backoff_rate=2,
             interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
         )
 
         activate_level2_task = tasks.LambdaInvoke(
@@ -332,9 +346,11 @@ class OdincalStack(Stack):
         )
         activate_level2_task.add_retry(
             errors=["States.ALL"],
-            max_attempts=4,
+            max_attempts=42,
             backoff_rate=2,
             interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
         )
 
         # Set up workflow
