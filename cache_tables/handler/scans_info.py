@@ -1,5 +1,4 @@
 import datetime as dt
-from time import sleep
 from tempfile import TemporaryDirectory
 from typing import Any
 
@@ -73,22 +72,15 @@ class RetriesExhaustedError(Exception):
 def get_odin_data(
     endpoint: str,
     api_base: str = API_BASE,
-    max_retries: int = MAX_RETRIES,
 ) -> dict:
     url = f"{api_base}/{endpoint}"
-    retries = max_retries
-    while retries > 0:
-        try:
-            response = requests.get(url, timeout=365)
-            response.raise_for_status()
-            break
-        except (HTTPError, RequestException) as msg:
-            retries -= 1
-            if retries == 0:
-                raise RetriesExhaustedError(
-                    f"Retries exhausted for {url} ({msg})"
-                )
-            sleep(SLEEP_TIME * 2 ** (MAX_RETRIES - retries - 1))
+    try:
+        response = requests.get(url, timeout=365)
+        response.raise_for_status()
+    except (HTTPError, RequestException) as msg:
+        raise RetriesExhaustedError(
+            f"Retries exhausted for {url} ({msg})"
+        )
     return response.json()
 
 
