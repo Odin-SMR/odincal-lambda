@@ -217,7 +217,7 @@ class OdincalStack(Stack):
             errors=["States.ALL"],
             max_attempts=4,
             backoff_rate=2,
-            interval=Duration.minutes(1),
+            interval=Duration.minutes(6),
         )
 
         job_info_level1_task = tasks.LambdaInvoke(
@@ -242,13 +242,13 @@ class OdincalStack(Stack):
             errors=["Level1BPrepareDataError"],
             max_attempts=4,
             backoff_rate=2,
-            interval=Duration.minutes(10),
+            interval=Duration.minutes(12),
         )
         job_info_level1_task.add_retry(
             errors=["States.ALL"],
             max_attempts=4,
             backoff_rate=2,
-            interval=Duration.minutes(1),
+            interval=Duration.minutes(6),
         )
 
         calibrate_level1_task = tasks.LambdaInvoke(
@@ -273,7 +273,7 @@ class OdincalStack(Stack):
             errors=["States.ALL"],
             max_attempts=4,
             backoff_rate=2,
-            interval=Duration.minutes(1),
+            interval=Duration.minutes(6),
         )
 
         date_info_task = tasks.LambdaInvoke(
@@ -294,7 +294,7 @@ class OdincalStack(Stack):
             errors=["States.ALL"],
             max_attempts=4,
             backoff_rate=2,
-            interval=Duration.minutes(1),
+            interval=Duration.minutes(6),
         )
 
         scans_info_task = tasks.LambdaInvoke(
@@ -307,13 +307,13 @@ class OdincalStack(Stack):
             errors=["RetriesExhaustedError"],
             max_attempts=4,
             backoff_rate=2,
-            interval=Duration.minutes(10),
+            interval=Duration.minutes(12),
         )
         scans_info_task.add_retry(
             errors=["States.ALL"],
             max_attempts=4,
             backoff_rate=2,
-            interval=Duration.minutes(1),
+            interval=Duration.minutes(6),
         )
 
         activate_level2_task = tasks.LambdaInvoke(
@@ -334,7 +334,7 @@ class OdincalStack(Stack):
             errors=["States.ALL"],
             max_attempts=4,
             backoff_rate=2,
-            interval=Duration.minutes(1),
+            interval=Duration.minutes(6),
         )
 
         # Set up workflow
