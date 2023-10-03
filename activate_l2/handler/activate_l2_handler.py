@@ -48,13 +48,18 @@ def activate_l2_handler(event: Event, context: Context) -> dict[str, int]:
             "StatusCode": 404,
         }
 
-    sfn = boto3.client("stepfunctions")
     filename = os.path.split(event["File"])[-1]
 
+    sfn = boto3.client("stepfunctions")
     sfn.start_execution(
         stateMachineArn=state_machine_arn,
-        input=json.dumps({"Scans": event["ScansData"]}),
-        name=f"{filename}-{event['FreqMode']}-{create_short_hash()}",
+        input=json.dumps(
+            {
+                "ScanIDs": event["ScanIDs"],
+                "File": filename,
+                "Backend": event["Backend"],
+            }),
+        name=f"{filename}-{create_short_hash()}",
     )
 
     return {

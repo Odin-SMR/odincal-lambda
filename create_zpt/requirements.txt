@@ -1,0 +1,12 @@
+asciitree==0.3.3
+entrypoints==0.4
+fasteners==0.19
+numcodecs==0.11.0
+numpy==1.26.0
+pandas==2.1.1
+pyarrow==13.0.0
+python-dateutil==2.8.2
+pytz==2023.3.post1
+six==1.16.0
+tzdata==2023.3
+zarr==2.16.1

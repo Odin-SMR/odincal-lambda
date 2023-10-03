@@ -174,6 +174,69 @@ class OdincalStack(Stack):
             resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
         ))
 
+        check_zpt_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalCheckZPT",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.check_zpt_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+
+        check_era5_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalCheckERA5",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.check_era5_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+
+        check_solar_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalCheckSolar",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.check_solar_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+
+        create_zpt_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalCreateZPT",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.create_zpt_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+
+        get_scan_ids_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalGetScanIDs",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.get_scan_ids.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+        )
+
         activate_level2_lambda = Function(
             self,
             "OdinSMROdincalActivateLevel2Lambda",
@@ -312,6 +375,8 @@ class OdincalStack(Stack):
             "OdinSMROdincalScansInfoTask",
             lambda_function=scans_info_lambda,
             result_path="$.ScansInfo",
+            output_path="$.ScansInfo",
+            payload_response_only=True,
         )
         scans_info_task.add_retry(
             errors=["RetriesExhaustedError"],
@@ -330,16 +395,129 @@ class OdincalStack(Stack):
             jitter_strategy=sfn.JitterType.FULL,
         )
 
+        check_zpt_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalCheckZPTTask",
+            lambda_function=check_zpt_lambda,
+            result_path="$.CheckZPT",
+        )
+        check_zpt_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=42,
+            backoff_rate=2,
+            interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
+        )
+
+        check_era5_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalCheckERA5Task",
+            lambda_function=check_era5_lambda,
+            result_path="$.CheckERA5",
+            payload=sfn.TaskInput.from_object(
+                {
+                    "name": sfn.JsonPath.string_at("$.name"),
+                    "type": sfn.JsonPath.string_at("$.type"),
+                }
+            ),
+        )
+        check_era5_task.add_retry(
+            errors=["NoERA5DataError"],
+            max_attempts=42,
+            backoff_rate=2,
+            interval=Duration.hours(1),
+            max_delay=Duration.hours(24),
+            jitter_strategy=sfn.JitterType.FULL,
+        )
+        check_era5_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=42,
+            backoff_rate=2,
+            interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
+        )
+
+        check_solar_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalCheckSolarTask",
+            lambda_function=check_solar_lambda,
+            result_path="$.CheckSolar",
+            payload=sfn.TaskInput.from_object(
+                {
+                    "ScansInfo": sfn.JsonPath.list_at(
+                        "$.ScansInfo"
+                    ),
+                },
+            ),
+        )
+        check_solar_task.add_retry(
+            errors=["NoSolarDataError"],
+            max_attempts=42,
+            backoff_rate=2,
+            interval=Duration.hours(1),
+            max_delay=Duration.hours(24),
+            jitter_strategy=sfn.JitterType.FULL,
+        )
+        check_solar_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=42,
+            backoff_rate=2,
+            interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
+        )
+
+        create_zpt_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalCreateZPTTask",
+            lambda_function=create_zpt_lambda,
+            result_path="$.CreateZPT",
+            payload=sfn.TaskInput.from_object(
+                {
+                    "ScansInfo": sfn.JsonPath.list_at(
+                        "$.ScansInfo"
+                    ),
+                    "File": sfn.JsonPath.string_at("$.name"),
+                },
+            ),
+        )
+        create_zpt_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=42,
+            backoff_rate=2,
+            interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
+        )
+
+        get_scan_ids_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalGetScanIDsTask",
+            lambda_function=get_scan_ids_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "ScansInfo": sfn.JsonPath.list_at(
+                        "$.ScansInfo"
+                    ),
+                    "File": sfn.JsonPath.string_at("$.name"),
+                },
+            ),
+            result_path="$.GetScanIDs",
+        )
+
         activate_level2_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalActivateLevel2Task",
             lambda_function=activate_level2_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "ScansData": sfn.JsonPath.list_at(
-                        "$.ScansInfo.Payload.ScansInfo"
+                    "ScansIDs": sfn.JsonPath.list_at(
+                        "$.GetScanIDs.Paylog.ScanIDs"
                     ),
-                    "File": sfn.JsonPath.string_at("$.File"),
+                    "File": sfn.JsonPath.string_at("$.name"),
+                    "Backend": sfn.JsonPath.string_at("$.type"),
                 },
             ),
             result_path="$.ActivateLevel2",
@@ -399,6 +577,10 @@ class OdincalStack(Stack):
             "OdinSMRScansInfoFail",
             comment="Somthing went wrong when updating Scans Info tables",
         )
+        scans_info_success_state = sfn.Succeed(
+            self,
+            "OdinSMRScansInfoSuccess",
+        )
         scans_info_no_work_state = sfn.Succeed(
             self,
             "OdinSMRScansInfoNoScans",
@@ -407,6 +589,56 @@ class OdincalStack(Stack):
         check_scans_info_status_state = sfn.Choice(
             self,
             "OdinSMRCheckScansInfoStatus",
+        )
+
+        check_zpt_fail_state = sfn.Fail(
+            self,
+            "OdinSMRCheckZPTFail",
+            comment="Something went wrong when looking up ZPT",
+        )
+        check_zpt_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckZPTStatus",
+        )
+
+        check_solar_fail_state = sfn.Fail(
+            self,
+            "OdinSMRCheckSolarFail",
+            comment="Something went wrong when looking up Solar",
+        )
+        check_solar_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckSolarStatus",
+        )
+
+        check_era5_fail_state = sfn.Fail(
+            self,
+            "OdinSMRCheckERA5Fail",
+            comment="Something went wrong when looking up ERA5",
+        )
+        check_era5_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckERA5Status",
+        )
+
+        create_zpt_fail_state = sfn.Fail(
+            self,
+            "OdinSMRCreateZPTFail",
+            comment="Something went wrong when creating ZPT",
+        )
+        check_create_zpt_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckCreateZPTStatus",
+        )
+
+        get_scan_ids_fail_state = sfn.Fail(
+            self,
+            "OdinSMRGetScanIDsFail",
+            comment="Something went wrong when collecting scan ids",
+        )
+        check_get_scan_ids_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckGetScanIDsStatus",
         )
 
         activate_level2_fail_state = sfn.Fail(
@@ -463,7 +695,10 @@ class OdincalStack(Stack):
             "OdinSMROdincalMapScansInfo",
             max_concurrency=1,
             items_path="$.DateInfo.Payload.DateInfo",
+            result_path="$.ScansInfo",
         )
+        map_scans_info.next(check_zpt_task)
+
         check_date_info_status_state.when(
             sfn.Condition.number_equals(
                 "$.DateInfo.Payload.StatusCode",
@@ -476,20 +711,77 @@ class OdincalStack(Stack):
 
         check_scans_info_status_state.when(
             sfn.Condition.number_equals(
-                "$.ScansInfo.Payload.StatusCode",
+                "$.StatusCode",
                 200,
             ),
-            activate_level2_task,
+            scans_info_success_state,
         )
         check_scans_info_status_state.when(
             sfn.Condition.number_equals(
-                "$.ScansInfo.Payload.StatusCode",
+                "$.StatusCode",
                 204,
             ),
             scans_info_no_work_state,
         )
         check_scans_info_status_state.otherwise(scans_info_fail_state)
         scans_info_task.next(check_scans_info_status_state)
+
+        check_zpt_status_state.when(
+            sfn.Condition.number_equals(
+                "$.CheckZPT.Payload.StatusCode",
+                404,
+            ),
+            check_solar_task,
+        )
+        check_zpt_status_state.when(
+            sfn.Condition.number_equals(
+                "$.CheckZPT.Payload.StatusCode",
+                200,
+            ),
+            get_scan_ids_task,
+        )
+        check_zpt_status_state.otherwise(check_zpt_fail_state)
+        check_zpt_task.next(check_zpt_status_state)
+
+        check_solar_status_state.when(
+            sfn.Condition.number_equals(
+                "$.CheckSolar.Payload.StatusCode",
+                200,
+            ),
+            check_era5_task,
+        )
+        check_solar_status_state.otherwise(check_solar_fail_state)
+        check_solar_task.next(check_solar_status_state)
+
+        check_era5_status_state.when(
+            sfn.Condition.number_equals(
+                "$.CheckERA5.Payload.StatusCode",
+                200,
+            ),
+            create_zpt_task,
+        )
+        check_era5_status_state.otherwise(check_era5_fail_state)
+        check_era5_task.next(check_era5_status_state)
+
+        check_create_zpt_status_state.when(
+            sfn.Condition.number_equals(
+                "$.CreateZPT.Payload.StatusCode",
+                200,
+            ),
+            get_scan_ids_task,
+        )
+        check_create_zpt_status_state.otherwise(create_zpt_fail_state)
+        create_zpt_task.next(check_create_zpt_status_state)
+
+        check_get_scan_ids_status_state.when(
+            sfn.Condition.number_equals(
+                "$.GetScanIDs.Payload.StatusCode",
+                200,
+            ),
+            activate_level2_task,
+        )
+        check_get_scan_ids_status_state.otherwise(get_scan_ids_fail_state)
+        get_scan_ids_task.next(check_get_scan_ids_status_state)
 
         check_activate_level2_status_state.when(
             sfn.Condition.number_equals(
