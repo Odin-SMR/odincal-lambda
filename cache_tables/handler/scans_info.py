@@ -1,9 +1,9 @@
 import datetime as dt
-from time import sleep
 from tempfile import TemporaryDirectory
 from typing import Any
 
 import requests
+from requests.exceptions import HTTPError, RequestException
 
 from .odin_connection import odin_connection, setup_postgres
 from .ssm_parameters import get_parameters
@@ -72,70 +72,63 @@ class RetriesExhaustedError(Exception):
 def get_odin_data(
     endpoint: str,
     api_base: str = API_BASE,
-    max_retries: int = MAX_RETRIES,
 ) -> dict:
     url = f"{api_base}/{endpoint}"
-    response = requests.get(url, timeout=365)
-    retries = max_retries
-    while retries > 0:
-        try:
-            response.raise_for_status()
-            break
-        except requests.exceptions.HTTPError as msg:
-            retries -= 1
-            if retries == 0:
-                raise RetriesExhaustedError(
-                    f"Retries exhausted for {url} ({msg})"
-                )
-            sleep(SLEEP_TIME * 2 ** (MAX_RETRIES - retries - 1))
+    try:
+        response = requests.get(url, timeout=365)
+        response.raise_for_status()
+    except (HTTPError, RequestException) as msg:
+        raise RetriesExhaustedError(
+            f"Retries exhausted for {url} ({msg})"
+        )
     return response.json()
 
 
 def update_scans(
     pg_credentials,
-    date_info: dict[str, list[dict[str, Any]]]
+    date_info: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Populate database with 'cached' scans for each day.
     """
 
     all_scans = []
-    for date_str, info in date_info.items():
-        for freqmode_info in info:
-            freqmode = freqmode_info["FreqMode"]
-            if freqmode == 0:
-                continue
+    freqmode = date_info["FreqMode"]
+    if freqmode == 0:
+        return []
+    date_str = date_info["DateString"]
 
-            scans_api = f"rest_api/v5/freqmode_raw/{date_str}/{freqmode}/"
-            scan_data = get_odin_data(scans_api)
+    scans_api = f"rest_api/v5/freqmode_raw/{date_str}/{freqmode}/"
+    scan_data = get_odin_data(scans_api)
 
-            db_connection = odin_connection(pg_credentials)
-            db_cursor = db_connection.cursor()
+    db_connection = odin_connection(pg_credentials)
+    db_cursor = db_connection.cursor()
 
-            for scan in scan_data["Data"]:
-                add_to_database(
-                    db_cursor,
-                    dt.date.fromisoformat(date_str),
-                    freqmode_info['FreqMode'],
-                    freqmode_info['Backend'],
-                    scan["AltEnd"],
-                    scan["AltStart"],
-                    scan["DateTime"],
-                    scan["LatEnd"],
-                    scan["LatStart"],
-                    scan["LonEnd"],
-                    scan["LonStart"],
-                    scan["MJDEnd"],
-                    scan["MJDStart"],
-                    scan["NumSpec"],
-                    scan["ScanID"],
-                    scan["SunZD"],
-                    scan["Quality"],
-                )
-                all_scans.append(scan)
+    for scan in scan_data["Data"]:
+        if scan["ScanID"] in date_info["Scans"]:
+            add_to_database(
+                db_cursor,
+                dt.date.fromisoformat(date_str),
+                date_info['FreqMode'],
+                date_info['Backend'],
+                scan["AltEnd"],
+                scan["AltStart"],
+                scan["DateTime"],
+                scan["LatEnd"],
+                scan["LatStart"],
+                scan["LonEnd"],
+                scan["LonStart"],
+                scan["MJDEnd"],
+                scan["MJDStart"],
+                scan["NumSpec"],
+                scan["ScanID"],
+                scan["SunZD"],
+                scan["Quality"],
+            )
+            all_scans.append(scan)
 
-            db_connection.commit()
-            db_cursor.close()
-            db_connection.close()
+    db_connection.commit()
+    db_cursor.close()
+    db_connection.close()
 
     return all_scans
 
@@ -156,7 +149,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     ) as psql_dir:
         setup_postgres(psql_dir)
 
-        scans = update_scans(pg_credentials, event["DateInfo"])
+        scans = update_scans(pg_credentials, event)
+
+    if len(scans) == 0:
+        return {"StatusCode": 204}
 
     scans = [
         {
@@ -169,10 +165,12 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "MJDStart": scan["MJDStart"],
             "MJDEnd": scan["MJDEnd"],
             "ScanID": scan["ScanID"],
+            "FreqMode": event["FreqMode"],
+            "Backend": event["Backend"],
         }
         for scan in scans
-        if scan["ScanID"] in event["Scans"]
     ]
+
     return {
         "StatusCode": 200,
         "ScansInfo": scans,

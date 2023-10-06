@@ -53,8 +53,8 @@ def activate_l2_handler(event: Event, context: Context) -> dict[str, int]:
 
     sfn.start_execution(
         stateMachineArn=state_machine_arn,
-        input=json.dumps({"Scans": event["Scans"]}),
-        name=f"{filename}-{create_short_hash()}",
+        input=json.dumps({"Scans": event["ScansData"]}),
+        name=f"{filename}-{event['FreqMode']}-{create_short_hash()}",
     )
 
     return {
