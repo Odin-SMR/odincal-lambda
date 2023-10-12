@@ -7,7 +7,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 ZPT_BUCKET = "odin-zpt"
-ZPT_PATTERN = "{backend}/{prefix}/{filename}.zarr"
+ZPT_PATTERN = "{backend}/{prefix}/{filename}.parquet"
 
 
 class NoZPTError(Exception):

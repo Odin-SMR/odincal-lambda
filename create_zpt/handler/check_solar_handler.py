@@ -27,7 +27,7 @@ def assert_solar_exists(
 ) -> None:
     data = ds.dataset(
         f"{bucket}/{key}",
-        filesystem,
+        filesystem=filesystem,
     ).to_table(
         filter=ds.field("DATE") == Timestamp(date)
     ).to_pandas()
@@ -38,12 +38,21 @@ def assert_solar_exists(
 
 def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     dates: set[dt.date] = set()
-    for fm in event["ScansInfo"]:
-        dates = dates.union(
-            {mjd2datetime(scan["MJDStart"]).date() for scan in fm}
-        ).union(
-            {mjd2datetime(scan["MJDEnd"]).date() for scan in fm}
-        )
+    try:
+        for fm in event["ScansInfo"]:
+            dates = dates.union(
+                {
+                    mjd2datetime(scan["MJDStart"]).date()
+                    for scan in fm["ScansInfo"]
+                }
+            ).union(
+                {
+                    mjd2datetime(scan["MJDEnd"]).date()
+                    for scan in fm["ScansInfo"]
+                }
+            )
+    except Exception as err:
+        raise Exception(f"{err} ({event})")
 
     filesystem = S3FileSystem(region=S3_REGION)
     for date in dates:

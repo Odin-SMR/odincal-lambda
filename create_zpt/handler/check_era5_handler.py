@@ -6,11 +6,8 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
+from .era5_dataset import ERA5_BUCKET, ERA5_PATTERN
 from .time_util import mjd2datetime
-
-
-ERA5_BUCKET = "odin-era5"
-ERA5_PATTERN = "{year}/{month:02d}/ea_pl_{date}.zarr"
 
 
 class NoERA5DataError(Exception):
@@ -39,9 +36,9 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     dates: set[dt.date] = set()
     for fm in event["ScansInfo"]:
         dates = dates.union(
-            {mjd2datetime(scan["MJDStart"]).date() for scan in fm["ScanInfo"]}
+            {mjd2datetime(scan["MJDStart"]).date() for scan in fm["ScansInfo"]}
         ).union(
-            {mjd2datetime(scan["MJDEnd"]).date() for scan in fm["ScanInfo"]}
+            {mjd2datetime(scan["MJDEnd"]).date() for scan in fm["ScansInfo"]}
         )
 
     s3_client = boto3.resource("s3")
