@@ -16,13 +16,18 @@ from aws_cdk.aws_s3 import Bucket
 from constructs import Construct
 
 
+PSQL_BUCKET_NAME = "odin-psql"
+SOLAR_BUCKET_NAME = "odin-solar"
+ERA5_BUCKET_NAME = "odin-era5"
+ZPT_BUCKET_NAME = "odin-zpt"
+
+
 class OdincalStack(Stack):
     def __init__(
         self,
         scope: Construct,
         id: str,
         ssm_root: str,
-        psql_bucket_name: str,
         lambda_timeout: Duration = Duration.seconds(900),
         **kwargs
     ) -> None:
@@ -57,7 +62,7 @@ class OdincalStack(Stack):
                 "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
                 "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
                 "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
-                "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
+                "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
             },
         )
         preprocess_level1_lambda.add_to_role_policy(PolicyStatement(
@@ -83,7 +88,7 @@ class OdincalStack(Stack):
                 "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
                 "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
                 "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
-                "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
+                "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
             },
         )
         get_job_info_level1_lambda.add_to_role_policy(PolicyStatement(
@@ -109,7 +114,7 @@ class OdincalStack(Stack):
                 "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
                 "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
                 "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
-                "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
+                "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
             },
         )
         calibrate_level1_lambda.add_to_role_policy(PolicyStatement(
@@ -231,7 +236,7 @@ class OdincalStack(Stack):
             "OdinSMROdincalGetScanIDs",
             code=DockerImageCode.from_image_asset(
                 "./create_zpt",
-                cmd=["handler.get_scan_ids.handler"],
+                cmd=["handler.get_scan_ids_handler.handler"],
             ),
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
@@ -417,9 +422,10 @@ class OdincalStack(Stack):
             result_path="$.CheckERA5",
             payload=sfn.TaskInput.from_object(
                 {
-                    "name": sfn.JsonPath.string_at("$.name"),
-                    "type": sfn.JsonPath.string_at("$.type"),
-                }
+                    "ScansInfo": sfn.JsonPath.list_at(
+                        "$.ScansInfo"
+                    ),
+                },
             ),
         )
         check_era5_task.add_retry(
@@ -514,7 +520,7 @@ class OdincalStack(Stack):
             payload=sfn.TaskInput.from_object(
                 {
                     "ScansIDs": sfn.JsonPath.list_at(
-                        "$.GetScanIDs.Paylog.ScanIDs"
+                        "$.GetScanIDs.Payload.ScanIDs"
                     ),
                     "File": sfn.JsonPath.string_at("$.name"),
                     "Backend": sfn.JsonPath.string_at("$.type"),
@@ -567,6 +573,11 @@ class OdincalStack(Stack):
             "OdinSMRDateInfoFail",
             comment="Somthing went wrong when updating Date Info tables",
         )
+        date_info_no_scans_state = sfn.Succeed(
+            self,
+            "OdinSMRDateInfoNoScans",
+            comment="No scans for file, so nothing to do (e.g. FM 0)",
+        )
         check_date_info_status_state = sfn.Choice(
             self,
             "OdinSMRCheckDateInfoStatus",
@@ -584,7 +595,7 @@ class OdincalStack(Stack):
         scans_info_no_work_state = sfn.Succeed(
             self,
             "OdinSMRScansInfoNoScans",
-            comment="No scans for freqmode, so nothing to do (e.g. FM  0)",
+            comment="No scans for freqmode, so nothing to do (e.g. FM 0)",
         )
         check_scans_info_status_state = sfn.Choice(
             self,
@@ -635,6 +646,11 @@ class OdincalStack(Stack):
             self,
             "OdinSMRGetScanIDsFail",
             comment="Something went wrong when collecting scan ids",
+        )
+        get_scan_ids_no_scans_state = sfn.Succeed(
+            self,
+            "OdinSMRGetScanIDsNoScans",
+            comment="No scans for file, so nothing to do (e.g. FM 0)",
         )
         check_get_scan_ids_status_state = sfn.Choice(
             self,
@@ -706,6 +722,13 @@ class OdincalStack(Stack):
             ),
             map_scans_info.iterator(scans_info_task),
         )
+        check_date_info_status_state.when(
+            sfn.Condition.number_equals(
+                "$.DateInfo.Payload.StatusCode",
+                204,
+            ),
+            date_info_no_scans_state,
+        )
         check_date_info_status_state.otherwise(date_info_fail_state)
         date_info_task.next(check_date_info_status_state)
 
@@ -766,13 +789,20 @@ class OdincalStack(Stack):
         check_create_zpt_status_state.when(
             sfn.Condition.number_equals(
                 "$.CreateZPT.Payload.StatusCode",
-                200,
+                201,
             ),
             get_scan_ids_task,
         )
         check_create_zpt_status_state.otherwise(create_zpt_fail_state)
         create_zpt_task.next(check_create_zpt_status_state)
 
+        check_get_scan_ids_status_state.when(
+            sfn.Condition.number_equals(
+                "$.GetScanIDs.Payload.StatusCode",
+                204,
+            ),
+            get_scan_ids_no_scans_state,
+        )
         check_get_scan_ids_status_state.when(
             sfn.Condition.number_equals(
                 "$.GetScanIDs.Payload.StatusCode",
@@ -811,11 +841,34 @@ class OdincalStack(Stack):
         psql_bucket = Bucket.from_bucket_name(
             self,
             "OdinSMROdincalPsqlBucket",
-            psql_bucket_name,
+            PSQL_BUCKET_NAME,
         )
-
         psql_bucket.grant_read(preprocess_level1_lambda)
         psql_bucket.grant_read(get_job_info_level1_lambda)
         psql_bucket.grant_read(calibrate_level1_lambda)
         psql_bucket.grant_read(date_info_lambda)
         psql_bucket.grant_read(scans_info_lambda)
+
+        solar_bucket = Bucket.from_bucket_name(
+            self,
+            "OdinSMROdincalSolarBucket",
+            SOLAR_BUCKET_NAME,
+        )
+        solar_bucket.grant_read(check_solar_lambda)
+        solar_bucket.grant_read(create_zpt_lambda)
+
+        era5_bucket = Bucket.from_bucket_name(
+            self,
+            "OdinSMROdincalERA5Bucket",
+            ERA5_BUCKET_NAME,
+        )
+        era5_bucket.grant_read(check_era5_lambda)
+        era5_bucket.grant_read(create_zpt_lambda)
+
+        zpt_bucket = Bucket.from_bucket_name(
+            self,
+            "OdinSMROdincalZPTBucket",
+            ZPT_BUCKET_NAME,
+        )
+        zpt_bucket.grant_read(check_zpt_lambda)
+        zpt_bucket.grant_read_write(create_zpt_lambda)

@@ -11,7 +11,6 @@ OdincalStack(
     app,
     "OdinSMROdincalStack",
     ssm_root="/odin/psql",
-    psql_bucket_name="odin-psql",
     env=env_EU,
 )
 
