@@ -1,7 +1,7 @@
 from aws_cdk import Duration, Stack
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
-from aws_cdk.aws_ec2 import Vpc, SubnetSelection, SubnetType
+from aws_cdk.aws_ec2 import Vpc, IVpc, SubnetSelection, SubnetType
 from aws_cdk.aws_iam import Effect, PolicyStatement
 from aws_cdk.aws_lambda import (
     Architecture,
@@ -12,7 +12,7 @@ from aws_cdk.aws_lambda import (
     InlineCode,
     Runtime,
 )
-from aws_cdk.aws_s3 import Bucket
+from aws_cdk.aws_s3 import Bucket, IBucket
 from constructs import Construct
 
 
@@ -23,28 +23,23 @@ ZPT_BUCKET_NAME = "odin-zpt"
 
 
 class OdincalStack(Stack):
-    def __init__(
+    def set_up_calibration(
         self,
-        scope: Construct,
-        id: str,
-        ssm_root: str,
+        next_task: sfn.State,
+        vpc: IVpc,
+        vpc_subnets: SubnetSelection,
+        psql_bucket: IBucket,
         lambda_timeout: Duration = Duration.seconds(900),
-        **kwargs
-    ) -> None:
-        super().__init__(scope, id, **kwargs)
+    ) -> sfn.State:
+        # Set up lambdas:
+        environment = {
+            "ODIN_PG_HOST_SSM_NAME": f"{self.ssm_root}/host",
+            "ODIN_PG_USER_SSM_NAME": f"{self.ssm_root}/user",
+            "ODIN_PG_PASS_SSM_NAME": f"{self.ssm_root}/password",
+            "ODIN_PG_DB_SSM_NAME": f"{self.ssm_root}/db",
+            "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
+        }
 
-        # Set up VPC
-        vpc = Vpc.from_lookup(
-            self,
-            "OdinSMRCalibrateLevel1lVPC",
-            is_default=False,
-            vpc_name="OdinVPC",
-        )
-        vpc_subnets = SubnetSelection(
-            subnet_type=SubnetType.PRIVATE_WITH_EGRESS
-        )
-
-        # Set up Lambda functions
         preprocess_level1_lambda = DockerImageFunction(
             self,
             "OdinSMROdincalPreProcessLambda",
@@ -57,18 +52,12 @@ class OdincalStack(Stack):
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
             memory_size=2048,
-            environment={
-                "ODIN_PG_HOST_SSM_NAME": f"{ssm_root}/host",
-                "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
-                "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
-                "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
-                "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
-            },
+            environment=environment,
         )
         preprocess_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
+            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
         ))
 
         get_job_info_level1_lambda = DockerImageFunction(
@@ -83,18 +72,12 @@ class OdincalStack(Stack):
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
             memory_size=2048,
-            environment={
-                "ODIN_PG_HOST_SSM_NAME": f"{ssm_root}/host",
-                "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
-                "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
-                "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
-                "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
-            },
+            environment=environment,
         )
         get_job_info_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
+            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
         ))
 
         calibrate_level1_lambda = DockerImageFunction(
@@ -109,159 +92,17 @@ class OdincalStack(Stack):
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
             memory_size=2048,
-            environment={
-                "ODIN_PG_HOST_SSM_NAME": f"{ssm_root}/host",
-                "ODIN_PG_USER_SSM_NAME": f"{ssm_root}/user",
-                "ODIN_PG_PASS_SSM_NAME": f"{ssm_root}/password",
-                "ODIN_PG_DB_SSM_NAME": f"{ssm_root}/db",
-                "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
-            },
+            environment=environment,
         )
         calibrate_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
+            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
         ))
 
-        date_info_lambda = Function(
-            self,
-            "OdinSMROdincalDateInfoLambda",
-            code=Code.from_asset(
-                "cache_tables",
-                bundling={
-                    "image": Runtime.PYTHON_3_10.bundling_image,
-                    "command": [
-                        "bash",
-                        "-c",
-                        "pip install -r requirements.txt -t /asset-output && cp -aur . /asset-output",  # noqa: E501
-                    ],
-                },
-            ),
-            handler="handler.date_info.handler",
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-            runtime=Runtime.PYTHON_3_10,
-            memory_size=1024,
-            vpc=vpc,
-            vpc_subnets=vpc_subnets,
-        )
-        date_info_lambda.add_to_role_policy(PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
-        ))
-
-        scans_info_lambda = Function(
-            self,
-            "OdinSMROdincalScansInfoLambda",
-            code=Code.from_asset(
-                "cache_tables",
-                bundling={
-                    "image": Runtime.PYTHON_3_10.bundling_image,
-                    "command": [
-                        "bash",
-                        "-c",
-                        "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output",  # noqa: 501
-                    ],
-                },
-            ),
-            handler="handler.scans_info.handler",
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-            runtime=Runtime.PYTHON_3_10,
-            memory_size=1024,
-            vpc=vpc,
-            vpc_subnets=vpc_subnets,
-        )
-        scans_info_lambda.add_to_role_policy(PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{ssm_root}/*"]
-        ))
-
-        check_zpt_lambda = DockerImageFunction(
-            self,
-            "OdinSMROdincalCheckZPT",
-            code=DockerImageCode.from_image_asset(
-                "./create_zpt",
-                cmd=["handler.check_zpt_handler.handler"],
-            ),
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-            vpc=vpc,
-            vpc_subnets=vpc_subnets,
-        )
-
-        check_era5_lambda = DockerImageFunction(
-            self,
-            "OdinSMROdincalCheckERA5",
-            code=DockerImageCode.from_image_asset(
-                "./create_zpt",
-                cmd=["handler.check_era5_handler.handler"],
-            ),
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-            vpc=vpc,
-            vpc_subnets=vpc_subnets,
-        )
-
-        check_solar_lambda = DockerImageFunction(
-            self,
-            "OdinSMROdincalCheckSolar",
-            code=DockerImageCode.from_image_asset(
-                "./create_zpt",
-                cmd=["handler.check_solar_handler.handler"],
-            ),
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-            vpc=vpc,
-            vpc_subnets=vpc_subnets,
-        )
-
-        create_zpt_lambda = DockerImageFunction(
-            self,
-            "OdinSMROdincalCreateZPT",
-            code=DockerImageCode.from_image_asset(
-                "./create_zpt",
-                cmd=["handler.create_zpt_handler.handler"],
-            ),
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-            vpc=vpc,
-            vpc_subnets=vpc_subnets,
-            memory_size=2048,
-        )
-
-        get_scan_ids_lambda = DockerImageFunction(
-            self,
-            "OdinSMROdincalGetScanIDs",
-            code=DockerImageCode.from_image_asset(
-                "./create_zpt",
-                cmd=["handler.get_scan_ids_handler.handler"],
-            ),
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-        )
-
-        activate_level2_lambda = Function(
-            self,
-            "OdinSMROdincalActivateLevel2Lambda",
-            code=InlineCode.from_asset("activate_l2"),
-            handler="handler.activate_l2_handler.activate_l2_handler",
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-            runtime=Runtime.PYTHON_3_10,
-        )
-
-        activate_level2_lambda.add_to_role_policy(
-            PolicyStatement(
-                actions=[
-                    "states:ListStateMachines",
-                    "states:StartExecution",
-                ],
-                resources=["*"],
-            ),
-        )
+        # Set up additional permissions
+        psql_bucket.grant_read(preprocess_level1_lambda)
+        psql_bucket.grant_read(get_job_info_level1_lambda)
 
         # Set up tasks
         preprocess_level1_task = tasks.LambdaInvoke(
@@ -353,6 +194,131 @@ class OdincalStack(Stack):
             jitter_strategy=sfn.JitterType.FULL,
         )
 
+        # Set up workflow
+        preprocess_level1_fail_state = sfn.Fail(
+            self,
+            "OdinSMRPreprocessLevel1Fail",
+            comment="Somthing went wrong when preprocessing Level 0 file",
+        )
+        check_preprocess_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckPreprocessLevel1Status",
+        )
+
+        job_info_level1_fail_state = sfn.Fail(
+            self,
+            "OdinSMRGetJobInfoLevel1Fail",
+            comment="Somthing went wrong when getting job for Level 0 file",
+        )
+        check_job_info_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckGetJobInfoLevel1Status",
+        )
+
+        calibrate_level1_fail_state = sfn.Fail(
+            self,
+            "OdinSMRCalibrateLevel1Fail",
+            comment="Somthing went wrong when importing Level 0 file",
+        )
+        check_calibrate_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckCalibrateLevel1Status",
+        )
+
+        check_preprocess_status_state.when(
+            sfn.Condition.number_equals(
+                "$.PreprocessLevel1.Payload.StatusCode",
+                200,
+            ),
+            job_info_level1_task,
+        )
+        check_preprocess_status_state.otherwise(preprocess_level1_fail_state)
+        preprocess_level1_task.next(check_preprocess_status_state)
+
+        check_job_info_status_state.when(
+            sfn.Condition.number_equals(
+                "$.JobInfo.Payload.StatusCode",
+                200,
+            ),
+            calibrate_level1_task,
+        )
+        check_job_info_status_state.otherwise(job_info_level1_fail_state)
+        job_info_level1_task.next(check_job_info_status_state)
+
+        check_calibrate_status_state.when(
+            sfn.Condition.number_equals(
+                "$.CalibrateLevel1.Payload.StatusCode",
+                200,
+            ),
+            next_task,
+        )
+        check_calibrate_status_state.otherwise(calibrate_level1_fail_state)
+        calibrate_level1_task.next(check_calibrate_status_state)
+
+        return preprocess_level1_task
+
+    def set_up_cache_tables(
+        self,
+        next_task: sfn.State,
+        vpc: IVpc,
+        vpc_subnets: SubnetSelection,
+        psql_bucket: IBucket,
+        lambda_timeout: Duration = Duration.seconds(900),
+    ) -> sfn.State:
+        # Set up lambdas:
+        code = Code.from_asset(
+            "cache_tables",
+            bundling={
+                "image": Runtime.PYTHON_3_10.bundling_image,
+                "command": [
+                    "bash",
+                    "-c",
+                    "pip install -r requirements.txt -t /asset-output && cp -aur . /asset-output",  # noqa: E501
+                ],
+            },
+        )
+
+        date_info_lambda = Function(
+            self,
+            "OdinSMROdincalDateInfoLambda",
+            code=code,
+            handler="handler.date_info.handler",
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            runtime=Runtime.PYTHON_3_10,
+            memory_size=1024,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+        date_info_lambda.add_to_role_policy(PolicyStatement(
+            effect=Effect.ALLOW,
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
+        ))
+
+        scans_info_lambda = Function(
+            self,
+            "OdinSMROdincalScansInfoLambda",
+            code=code,
+            handler="handler.scans_info.handler",
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            runtime=Runtime.PYTHON_3_10,
+            memory_size=1024,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+        scans_info_lambda.add_to_role_policy(PolicyStatement(
+            effect=Effect.ALLOW,
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
+        ))
+
+        # Set up additional permissions
+        psql_bucket.grant_read(date_info_lambda)
+        psql_bucket.grant_read(scans_info_lambda)
+
+        # Set up tasks
         date_info_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalDateInfoTask",
@@ -401,6 +367,172 @@ class OdincalStack(Stack):
             jitter_strategy=sfn.JitterType.FULL,
         )
 
+        # Set up workflow
+        date_info_fail_state = sfn.Fail(
+            self,
+            "OdinSMRDateInfoFail",
+            comment="Somthing went wrong when updating Date Info tables",
+        )
+        date_info_no_scans_state = sfn.Succeed(
+            self,
+            "OdinSMRDateInfoNoScans",
+            comment="No scans for file, so nothing to do (e.g. FM 0)",
+        )
+        check_date_info_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckDateInfoStatus",
+        )
+
+        scans_info_fail_state = sfn.Fail(
+            self,
+            "OdinSMRScansInfoFail",
+            comment="Somthing went wrong when updating Scans Info tables",
+        )
+        scans_info_success_state = sfn.Succeed(
+            self,
+            "OdinSMRScansInfoSuccess",
+        )
+        scans_info_no_work_state = sfn.Succeed(
+            self,
+            "OdinSMRScansInfoNoScans",
+            comment="No scans for freqmode, so nothing to do (e.g. FM 0)",
+        )
+        check_scans_info_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckScansInfoStatus",
+        )
+
+        map_scans_info = sfn.Map(
+            self,
+            "OdinSMROdincalMapScansInfo",
+            max_concurrency=1,
+            items_path="$.DateInfo.Payload.DateInfo",
+            result_path="$.ScansInfo",
+        )
+        map_scans_info.next(next_task)
+
+        check_date_info_status_state.when(
+            sfn.Condition.number_equals(
+                "$.DateInfo.Payload.StatusCode",
+                200,
+            ),
+            map_scans_info.iterator(scans_info_task),
+        )
+        check_date_info_status_state.when(
+            sfn.Condition.number_equals(
+                "$.DateInfo.Payload.StatusCode",
+                204,
+            ),
+            date_info_no_scans_state,
+        )
+        check_date_info_status_state.otherwise(date_info_fail_state)
+        date_info_task.next(check_date_info_status_state)
+
+        check_scans_info_status_state.when(
+            sfn.Condition.number_equals(
+                "$.StatusCode",
+                200,
+            ),
+            scans_info_success_state,
+        )
+        check_scans_info_status_state.when(
+            sfn.Condition.number_equals(
+                "$.StatusCode",
+                204,
+            ),
+            scans_info_no_work_state,
+        )
+        check_scans_info_status_state.otherwise(scans_info_fail_state)
+        scans_info_task.next(check_scans_info_status_state)
+
+        return date_info_task
+
+    def set_up_create_zpt(
+        self,
+        next_task: sfn.State,
+        vpc: IVpc,
+        vpc_subnets: SubnetSelection,
+        solar_bucket: IBucket,
+        era5_bucket: IBucket,
+        zpt_bucket: IBucket,
+        lambda_timeout: Duration = Duration.seconds(900),
+    ) -> sfn.State:
+        # Set up Lambda functions
+        check_zpt_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalCheckZPT",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.check_zpt_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+
+        check_era5_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalCheckERA5",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.check_era5_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+
+        check_solar_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalCheckSolar",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.check_solar_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+        )
+
+        create_zpt_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalCreateZPT",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.create_zpt_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            vpc=vpc,
+            vpc_subnets=vpc_subnets,
+            memory_size=2048,
+        )
+
+        get_scan_ids_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalGetScanIDs",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.get_scan_ids_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+        )
+
+        # Set up additional permissions
+        solar_bucket.grant_read(check_solar_lambda)
+        solar_bucket.grant_read(create_zpt_lambda)
+
+        era5_bucket.grant_read(check_era5_lambda)
+        era5_bucket.grant_read(create_zpt_lambda)
+
+        zpt_bucket.grant_read(check_zpt_lambda)
+        zpt_bucket.grant_read_write(create_zpt_lambda)
+
+        # Set up tasks
         check_zpt_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalCheckZPTTask",
@@ -514,23 +646,7 @@ class OdincalStack(Stack):
             ),
             result_path="$.GetScanIDs",
         )
-
-        activate_level2_task = tasks.LambdaInvoke(
-            self,
-            "OdinSMROdincalActivateLevel2Task",
-            lambda_function=activate_level2_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "ScansIDs": sfn.JsonPath.list_at(
-                        "$.GetScanIDs.Payload.ScanIDs"
-                    ),
-                    "File": sfn.JsonPath.string_at("$.name"),
-                    "Backend": sfn.JsonPath.string_at("$.type"),
-                },
-            ),
-            result_path="$.ActivateLevel2",
-        )
-        activate_level2_task.add_retry(
+        get_scan_ids_task.add_retry(
             errors=["States.ALL"],
             max_attempts=42,
             backoff_rate=2,
@@ -540,70 +656,6 @@ class OdincalStack(Stack):
         )
 
         # Set up workflow
-        preprocess_level1_fail_state = sfn.Fail(
-            self,
-            "OdinSMRPreprocessLevel1Fail",
-            comment="Somthing went wrong when preprocessing Level 0 file",
-        )
-        check_preprocess_status_state = sfn.Choice(
-            self,
-            "OdinSMRCheckPreprocessLevel1Status",
-        )
-
-        job_info_level1_fail_state = sfn.Fail(
-            self,
-            "OdinSMRGetJobInfoLevel1Fail",
-            comment="Somthing went wrong when getting job for Level 0 file",
-        )
-        check_job_info_status_state = sfn.Choice(
-            self,
-            "OdinSMRCheckGetJobInfoLevel1Status",
-        )
-
-        calibrate_level1_fail_state = sfn.Fail(
-            self,
-            "OdinSMRCalibrateLevel1Fail",
-            comment="Somthing went wrong when importing Level 0 file",
-        )
-        check_calibrate_status_state = sfn.Choice(
-            self,
-            "OdinSMRCheckCalibrateLevel1Status",
-        )
-
-        date_info_fail_state = sfn.Fail(
-            self,
-            "OdinSMRDateInfoFail",
-            comment="Somthing went wrong when updating Date Info tables",
-        )
-        date_info_no_scans_state = sfn.Succeed(
-            self,
-            "OdinSMRDateInfoNoScans",
-            comment="No scans for file, so nothing to do (e.g. FM 0)",
-        )
-        check_date_info_status_state = sfn.Choice(
-            self,
-            "OdinSMRCheckDateInfoStatus",
-        )
-
-        scans_info_fail_state = sfn.Fail(
-            self,
-            "OdinSMRScansInfoFail",
-            comment="Somthing went wrong when updating Scans Info tables",
-        )
-        scans_info_success_state = sfn.Succeed(
-            self,
-            "OdinSMRScansInfoSuccess",
-        )
-        scans_info_no_work_state = sfn.Succeed(
-            self,
-            "OdinSMRScansInfoNoScans",
-            comment="No scans for freqmode, so nothing to do (e.g. FM 0)",
-        )
-        check_scans_info_status_state = sfn.Choice(
-            self,
-            "OdinSMRCheckScansInfoStatus",
-        )
-
         check_zpt_fail_state = sfn.Fail(
             self,
             "OdinSMRCheckZPTFail",
@@ -658,98 +710,6 @@ class OdincalStack(Stack):
             self,
             "OdinSMRCheckGetScanIDsStatus",
         )
-
-        activate_level2_fail_state = sfn.Fail(
-            self,
-            "OdinSMRActivateL2Fail",
-            comment="Somthing went wrong when calling Level 2 processing",
-        )
-        activate_level2_success_state = sfn.Succeed(
-            self,
-            "OdinSMRActivateLevel2Success",
-        )
-        activate_level2_not_found_state = sfn.Succeed(
-            self,
-            "OdinSMRActivateLevel2NotFound",
-            comment="State machine for Level 2 not found",
-        )
-        check_activate_level2_status_state = sfn.Choice(
-            self,
-            "OdinSMRActivateLevel2Status",
-        )
-
-        check_preprocess_status_state.when(
-            sfn.Condition.number_equals(
-                "$.PreprocessLevel1.Payload.StatusCode",
-                200,
-            ),
-            job_info_level1_task,
-        )
-        check_preprocess_status_state.otherwise(preprocess_level1_fail_state)
-        preprocess_level1_task.next(check_preprocess_status_state)
-
-        check_job_info_status_state.when(
-            sfn.Condition.number_equals(
-                "$.JobInfo.Payload.StatusCode",
-                200,
-            ),
-            calibrate_level1_task,
-        )
-        check_job_info_status_state.otherwise(job_info_level1_fail_state)
-        job_info_level1_task.next(check_job_info_status_state)
-
-        check_calibrate_status_state.when(
-            sfn.Condition.number_equals(
-                "$.CalibrateLevel1.Payload.StatusCode",
-                200,
-            ),
-            date_info_task,
-        )
-        check_calibrate_status_state.otherwise(calibrate_level1_fail_state)
-        calibrate_level1_task.next(check_calibrate_status_state)
-
-        map_scans_info = sfn.Map(
-            self,
-            "OdinSMROdincalMapScansInfo",
-            max_concurrency=1,
-            items_path="$.DateInfo.Payload.DateInfo",
-            result_path="$.ScansInfo",
-        )
-        map_scans_info.next(check_zpt_task)
-
-        check_date_info_status_state.when(
-            sfn.Condition.number_equals(
-                "$.DateInfo.Payload.StatusCode",
-                200,
-            ),
-            map_scans_info.iterator(scans_info_task),
-        )
-        check_date_info_status_state.when(
-            sfn.Condition.number_equals(
-                "$.DateInfo.Payload.StatusCode",
-                204,
-            ),
-            date_info_no_scans_state,
-        )
-        check_date_info_status_state.otherwise(date_info_fail_state)
-        date_info_task.next(check_date_info_status_state)
-
-        check_scans_info_status_state.when(
-            sfn.Condition.number_equals(
-                "$.StatusCode",
-                200,
-            ),
-            scans_info_success_state,
-        )
-        check_scans_info_status_state.when(
-            sfn.Condition.number_equals(
-                "$.StatusCode",
-                204,
-            ),
-            scans_info_no_work_state,
-        )
-        check_scans_info_status_state.otherwise(scans_info_fail_state)
-        scans_info_task.next(check_scans_info_status_state)
 
         check_zpt_status_state.when(
             sfn.Condition.number_equals(
@@ -810,10 +770,83 @@ class OdincalStack(Stack):
                 "$.GetScanIDs.Payload.StatusCode",
                 200,
             ),
-            activate_level2_task,
+            next_task,
         )
         check_get_scan_ids_status_state.otherwise(get_scan_ids_fail_state)
         get_scan_ids_task.next(check_get_scan_ids_status_state)
+
+        return check_zpt_task
+
+    def set_up_activate_level2(
+        self,
+        lambda_timeout: Duration = Duration.seconds(900),
+    ) -> sfn.State:
+
+        # Set up Lambda functions
+        activate_level2_lambda = Function(
+            self,
+            "OdinSMROdincalActivateLevel2Lambda",
+            code=InlineCode.from_asset("activate_l2"),
+            handler="handler.activate_l2_handler.activate_l2_handler",
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+            runtime=Runtime.PYTHON_3_10,
+        )
+
+        activate_level2_lambda.add_to_role_policy(
+            PolicyStatement(
+                actions=[
+                    "states:ListStateMachines",
+                    "states:StartExecution",
+                ],
+                resources=["*"],
+            ),
+        )
+
+        # Set up tasks
+        activate_level2_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalActivateLevel2Task",
+            lambda_function=activate_level2_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "ScansIDs": sfn.JsonPath.list_at(
+                        "$.GetScanIDs.Payload.ScanIDs"
+                    ),
+                    "File": sfn.JsonPath.string_at("$.name"),
+                    "Backend": sfn.JsonPath.string_at("$.type"),
+                },
+            ),
+            result_path="$.ActivateLevel2",
+        )
+        activate_level2_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=42,
+            backoff_rate=2,
+            interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
+        )
+
+        # Set up workflow
+        activate_level2_fail_state = sfn.Fail(
+            self,
+            "OdinSMRActivateL2Fail",
+            comment="Somthing went wrong when calling Level 2 processing",
+        )
+        activate_level2_success_state = sfn.Succeed(
+            self,
+            "OdinSMRActivateLevel2Success",
+        )
+        activate_level2_not_found_state = sfn.Succeed(
+            self,
+            "OdinSMRActivateLevel2NotFound",
+            comment="State machine for Level 2 not found",
+        )
+        check_activate_level2_status_state = sfn.Choice(
+            self,
+            "OdinSMRActivateLevel2Status",
+        )
 
         check_activate_level2_status_state.when(
             sfn.Condition.number_equals(
@@ -832,45 +865,89 @@ class OdincalStack(Stack):
         check_activate_level2_status_state.otherwise(activate_level2_fail_state)
         activate_level2_task.next(check_activate_level2_status_state)
 
-        sfn.StateMachine(
+        return activate_level2_task
+
+    def __init__(
+        self,
+        scope: Construct,
+        id: str,
+        ssm_root: str,
+        lambda_timeout: Duration = Duration.seconds(900),
+        **kwargs
+    ) -> None:
+        super().__init__(scope, id, **kwargs)
+        self.ssm_root = ssm_root
+
+        # Set up VPC
+        vpc = Vpc.from_lookup(
             self,
-            "OdinSMROdincalStateMachine",
-            definition=preprocess_level1_task,
-            state_machine_name="OdinSMROdincalStateMachine",
+            "OdinSMRCalibrateLevel1lVPC",
+            is_default=False,
+            vpc_name="OdinVPC",
+        )
+        vpc_subnets = SubnetSelection(
+            subnet_type=SubnetType.PRIVATE_WITH_EGRESS
         )
 
-        # Set up additional permissions
+        activate_level2_task = self.set_up_activate_level2(
+            lambda_timeout,
+        )
+
+        # Set up buckets
         psql_bucket = Bucket.from_bucket_name(
             self,
             "OdinSMROdincalPsqlBucket",
             PSQL_BUCKET_NAME,
         )
-        psql_bucket.grant_read(preprocess_level1_lambda)
-        psql_bucket.grant_read(get_job_info_level1_lambda)
-        psql_bucket.grant_read(calibrate_level1_lambda)
-        psql_bucket.grant_read(date_info_lambda)
-        psql_bucket.grant_read(scans_info_lambda)
 
         solar_bucket = Bucket.from_bucket_name(
             self,
             "OdinSMROdincalSolarBucket",
             SOLAR_BUCKET_NAME,
         )
-        solar_bucket.grant_read(check_solar_lambda)
-        solar_bucket.grant_read(create_zpt_lambda)
 
         era5_bucket = Bucket.from_bucket_name(
             self,
             "OdinSMROdincalERA5Bucket",
             ERA5_BUCKET_NAME,
         )
-        era5_bucket.grant_read(check_era5_lambda)
-        era5_bucket.grant_read(create_zpt_lambda)
 
         zpt_bucket = Bucket.from_bucket_name(
             self,
             "OdinSMROdincalZPTBucket",
             ZPT_BUCKET_NAME,
         )
-        zpt_bucket.grant_read(check_zpt_lambda)
-        zpt_bucket.grant_read_write(create_zpt_lambda)
+
+        # Set up state machine
+        create_zpt_task = self.set_up_create_zpt(
+            activate_level2_task,
+            vpc,
+            vpc_subnets,
+            solar_bucket,
+            era5_bucket,
+            zpt_bucket,
+            lambda_timeout,
+        )
+
+        cache_tables_task = self.set_up_cache_tables(
+            create_zpt_task,
+            vpc,
+            vpc_subnets,
+            psql_bucket,
+            lambda_timeout,
+        )
+
+        calibrate_level1_task = self.set_up_calibration(
+            cache_tables_task,
+            vpc,
+            vpc_subnets,
+            psql_bucket,
+            lambda_timeout,
+        )
+
+        sfn.StateMachine(
+            self,
+            "OdinSMROdincalStateMachine",
+            definition=calibrate_level1_task,
+            state_machine_name="OdinSMROdincalStateMachine",
+        )
