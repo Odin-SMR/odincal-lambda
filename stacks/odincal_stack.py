@@ -103,6 +103,7 @@ class OdincalStack(Stack):
         # Set up additional permissions
         psql_bucket.grant_read(preprocess_level1_lambda)
         psql_bucket.grant_read(get_job_info_level1_lambda)
+        psql_bucket.grant_read(calibrate_level1_lambda)
 
         # Set up tasks
         preprocess_level1_task = tasks.LambdaInvoke(
