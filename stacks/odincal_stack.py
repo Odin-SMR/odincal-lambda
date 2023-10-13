@@ -229,6 +229,7 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
+            memory_size=2048,
         )
 
         get_scan_ids_lambda = DockerImageFunction(
@@ -486,6 +487,7 @@ class OdincalStack(Stack):
                         "$.ScansInfo"
                     ),
                     "File": sfn.JsonPath.string_at("$.name"),
+                    "Backend": sfn.JsonPath.string_at("$.type"),
                 },
             ),
         )

@@ -103,9 +103,9 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
 
     table = pa.Table.from_pandas(profiles.to_dataframe().reset_index())
 
-    filename = os.path.split(event["name"])[-1]
+    filename = os.path.split(event["File"])[-1]
     prefix = filename[0:3]
-    backend = event["type"]
+    backend = event["Backend"]
     zpt_file = ZPT_PATTERN.format(
         backend=backend,
         prefix=prefix,
