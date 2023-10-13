@@ -120,9 +120,11 @@ class OdincalStack(Stack):
         )
         preprocess_level1_task.add_retry(
             errors=["BadAttitude"],
-            max_attempts=3,
+            max_attempts=4,
             backoff_rate=2,
-            interval=Duration.days(5),
+            interval=Duration.days(3),
+            max_delay=Duration.days(14),
+            jitter_strategy=sfn.JitterType.FULL,
         )
         preprocess_level1_task.add_retry(
             errors=["States.ALL"],
