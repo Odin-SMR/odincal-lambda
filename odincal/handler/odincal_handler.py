@@ -14,7 +14,7 @@ from odincal.level1b_window_importer2 import (
 )
 
 
-ATT_BUFFER = 16 * 60 * 60 * 24 * 5  # Five day buffer
+ATT_BUFFER = 16 * 60 * 60 * 24 * 3  # Three day buffer
 ODINCAL_VERSION = 8
 
 
