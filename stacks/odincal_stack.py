@@ -15,6 +15,8 @@ from aws_cdk.aws_lambda import (
 from aws_cdk.aws_s3 import Bucket
 from constructs import Construct
 
+from stacks.log_group import OdinCalLogs
+
 
 class OdincalStack(Stack):
     def __init__(
@@ -38,7 +40,7 @@ class OdincalStack(Stack):
         vpc_subnets = SubnetSelection(
             subnet_type=SubnetType.PRIVATE_WITH_EGRESS
         )
-
+        log_group = OdinCalLogs(scope)
         # Set up Lambda functions
         preprocess_level1_lambda = DockerImageFunction(
             self,
@@ -60,6 +62,7 @@ class OdincalStack(Stack):
                 "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
             },
         )
+        preprocess_level1_lambda.log_group = log_group
         preprocess_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
@@ -86,6 +89,7 @@ class OdincalStack(Stack):
                 "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
             },
         )
+        get_job_info_level1_lambda.log_group = log_group
         get_job_info_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
@@ -112,6 +116,7 @@ class OdincalStack(Stack):
                 "ODIN_PSQL_BUCKET_NAME": psql_bucket_name,
             },
         )
+        calibrate_level1_lambda.log_group = log_group
         calibrate_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
@@ -140,6 +145,7 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
         )
+        date_info_lambda.log_group = log_group
         date_info_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
@@ -168,6 +174,7 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
         )
+        scans_info_lambda.log_group = log_group
         scans_info_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
@@ -183,7 +190,7 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
         )
-
+        activate_level2_lambda.log_group = log_group
         activate_level2_lambda.add_to_role_policy(
             PolicyStatement(
                 actions=[
