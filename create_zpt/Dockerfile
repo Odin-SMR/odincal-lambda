@@ -10,4 +10,4 @@ RUN  pip3 install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 COPY ./handler ${LAMBDA_TASK_ROOT}/handler
 
 # Set the CMD to your handler (could also be done as a parameter override outside of the Dockerfile)
-CMD [ "handelr.create_zpt_handler.handler" ] 
+CMD [ "handler.create_zpt_handler.handler" ] 
