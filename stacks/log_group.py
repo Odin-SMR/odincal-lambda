@@ -12,5 +12,5 @@ class OdinCalLogs(logs.LogGroup):
             scope,
             "OdinCalLogs",
             log_group_name="/Odin/OdinCal",
-            retention=RetentionDays(30),
+            retention=RetentionDays.ONE_MONTH,
         )
