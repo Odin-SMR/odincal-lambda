@@ -461,6 +461,17 @@ class OdincalStack(Stack):
         lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up Lambda functions
+        get_scan_ids_lambda = DockerImageFunction(
+            self,
+            "OdinSMROdincalGetScanIDs",
+            code=DockerImageCode.from_image_asset(
+                "./create_zpt",
+                cmd=["handler.get_scan_ids_handler.handler"],
+            ),
+            timeout=lambda_timeout,
+            architecture=Architecture.X86_64,
+        )
+
         check_zpt_lambda = DockerImageFunction(
             self,
             "OdinSMROdincalCheckZPT",
@@ -514,17 +525,6 @@ class OdincalStack(Stack):
             memory_size=2048,
         )
 
-        get_scan_ids_lambda = DockerImageFunction(
-            self,
-            "OdinSMROdincalGetScanIDs",
-            code=DockerImageCode.from_image_asset(
-                "./create_zpt",
-                cmd=["handler.get_scan_ids_handler.handler"],
-            ),
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-        )
-
         # Set up additional permissions
         solar_bucket.grant_read(check_solar_lambda)
         solar_bucket.grant_read(create_zpt_lambda)
@@ -536,6 +536,28 @@ class OdincalStack(Stack):
         zpt_bucket.grant_read_write(create_zpt_lambda)
 
         # Set up tasks
+        get_scan_ids_task = tasks.LambdaInvoke(
+            self,
+            "OdinSMROdincalGetScanIDsTask",
+            lambda_function=get_scan_ids_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "ScansInfo": sfn.JsonPath.list_at(
+                        "$.ScansInfo"
+                    ),
+                },
+            ),
+            result_path="$.GetScanIDs",
+        )
+        get_scan_ids_task.add_retry(
+            errors=["States.ALL"],
+            max_attempts=42,
+            backoff_rate=2,
+            interval=Duration.minutes(6),
+            max_delay=Duration.minutes(42),
+            jitter_strategy=sfn.JitterType.FULL,
+        )
+
         check_zpt_task = tasks.LambdaInvoke(
             self,
             "OdinSMROdincalCheckZPTTask",
@@ -635,30 +657,22 @@ class OdincalStack(Stack):
             jitter_strategy=sfn.JitterType.FULL,
         )
 
-        get_scan_ids_task = tasks.LambdaInvoke(
+        # Set up workflow
+        get_scan_ids_fail_state = sfn.Fail(
             self,
-            "OdinSMROdincalGetScanIDsTask",
-            lambda_function=get_scan_ids_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "ScansInfo": sfn.JsonPath.list_at(
-                        "$.ScansInfo"
-                    ),
-                    "File": sfn.JsonPath.string_at("$.name"),
-                },
-            ),
-            result_path="$.GetScanIDs",
+            "OdinSMRGetScanIDsFail",
+            comment="Something went wrong when collecting scan ids",
         )
-        get_scan_ids_task.add_retry(
-            errors=["States.ALL"],
-            max_attempts=42,
-            backoff_rate=2,
-            interval=Duration.minutes(6),
-            max_delay=Duration.minutes(42),
-            jitter_strategy=sfn.JitterType.FULL,
+        get_scan_ids_no_scans_state = sfn.Succeed(
+            self,
+            "OdinSMRGetScanIDsNoScans",
+            comment="No scans for file, so nothing to do (e.g. FM 0)",
+        )
+        check_get_scan_ids_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckGetScanIDsStatus",
         )
 
-        # Set up workflow
         check_zpt_fail_state = sfn.Fail(
             self,
             "OdinSMRCheckZPTFail",
@@ -699,20 +713,22 @@ class OdincalStack(Stack):
             "OdinSMRCheckCreateZPTStatus",
         )
 
-        get_scan_ids_fail_state = sfn.Fail(
-            self,
-            "OdinSMRGetScanIDsFail",
-            comment="Something went wrong when collecting scan ids",
+        check_get_scan_ids_status_state.when(
+            sfn.Condition.number_equals(
+                "$.GetScanIDs.Payload.StatusCode",
+                204,
+            ),
+            get_scan_ids_no_scans_state,
         )
-        get_scan_ids_no_scans_state = sfn.Succeed(
-            self,
-            "OdinSMRGetScanIDsNoScans",
-            comment="No scans for file, so nothing to do (e.g. FM 0)",
+        check_get_scan_ids_status_state.when(
+            sfn.Condition.number_equals(
+                "$.GetScanIDs.Payload.StatusCode",
+                200,
+            ),
+            check_zpt_task,
         )
-        check_get_scan_ids_status_state = sfn.Choice(
-            self,
-            "OdinSMRCheckGetScanIDsStatus",
-        )
+        check_get_scan_ids_status_state.otherwise(get_scan_ids_fail_state)
+        get_scan_ids_task.next(check_get_scan_ids_status_state)
 
         check_zpt_status_state.when(
             sfn.Condition.number_equals(
@@ -726,7 +742,7 @@ class OdincalStack(Stack):
                 "$.CheckZPT.Payload.StatusCode",
                 200,
             ),
-            get_scan_ids_task,
+            next_task,
         )
         check_zpt_status_state.otherwise(check_zpt_fail_state)
         check_zpt_task.next(check_zpt_status_state)
@@ -756,29 +772,12 @@ class OdincalStack(Stack):
                 "$.CreateZPT.Payload.StatusCode",
                 201,
             ),
-            get_scan_ids_task,
+            next_task,
         )
         check_create_zpt_status_state.otherwise(create_zpt_fail_state)
         create_zpt_task.next(check_create_zpt_status_state)
 
-        check_get_scan_ids_status_state.when(
-            sfn.Condition.number_equals(
-                "$.GetScanIDs.Payload.StatusCode",
-                204,
-            ),
-            get_scan_ids_no_scans_state,
-        )
-        check_get_scan_ids_status_state.when(
-            sfn.Condition.number_equals(
-                "$.GetScanIDs.Payload.StatusCode",
-                200,
-            ),
-            next_task,
-        )
-        check_get_scan_ids_status_state.otherwise(get_scan_ids_fail_state)
-        get_scan_ids_task.next(check_get_scan_ids_status_state)
-
-        return check_zpt_task
+        return get_scan_ids_task
 
     def set_up_activate_level2(
         self,
