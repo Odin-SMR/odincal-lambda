@@ -218,9 +218,15 @@ def preprocess_data(acfile, backend, version, con, stw1, stw2, tdiff, logger, pg
     """prepara data for calibration, i.e import data
        to database tables"""
 
+    logging.basicConfig()
+    logger = logging.getLogger('level1b actually pre-process')
+    logger.setLevel(logging.INFO)
+    logger.info('actually pre-processing file {0}'.format(acfile))
+
     prepare_data = PrepareData(acfile, backend, version, con, pg_string)
 
     # find out which sodaversion we have for this data
+    logger.debug("find out which sodaversion we have for this data")
     sodaversion = prepare_data.get_soda_version(stw1, stw2)
     if sodaversion == -1:
         info = {'info': 'no attitude data',
@@ -233,21 +239,33 @@ def preprocess_data(acfile, backend, version, con, stw1, stw2, tdiff, logger, pg
         return 1
 
     # perform level0 data processing
+    logger.debug("prepare att data")
     error = prepare_data.att_level1_process(
         stw1 - tdiff, stw2 + tdiff, sodaversion)
     if error == 1:
+        logger.warning(
+            'could not prep att data for file {0}'.format(acfile)
+        )
         report_result(con, acfile, {'info': 'pg problem'})
         return 1
 
+    logger.debug("prepare shk data")
     error = prepare_data.shk_level1_process(
         stw1 - tdiff, stw2 + tdiff)
     if error == 1:
+        logger.warning(
+            'could not prep shk data for file {0}'.format(acfile)
+        )
         report_result(con, acfile, {'info': 'pg problem'})
         return 1
 
+    logger.debug("prepare ac l1a data")
     error = prepare_data.ac_level1a_process(
         stw1 - tdiff, stw2 + tdiff)
     if error == 1:
+        logger.warning(
+            'could not prep ac l1a data for file {0}'.format(acfile)
+        )
         report_result(con, acfile, {'info': 'pg problem'})
         return 1
 
@@ -277,14 +295,18 @@ def preprocess_level1b(
 
     logging.basicConfig()
     logger = logging.getLogger('level1b pre-process')
+    logger.setLevel(logging.INFO)
     logger.info('pre-processing file {0}'.format(acfile))
 
     if con is None:
+        logger.debug("getting db connection for {0}".format(acfile))
         con = DB(pg_string)
 
+    logger.debug("intialising PrepareData for {0}".format(acfile))
     prepare_data = PrepareData(acfile, backend, version, con, pg_string)
 
     # find out max and min stw from acfile to calibrate
+    logger.debug("getting stw limits for {0}".format(acfile))
     try:
         stw1, stw2 = prepare_data.get_stw_from_acfile()
     except NoScansError as err:
@@ -294,9 +316,13 @@ def preprocess_level1b(
             'success_scans': 0,
             'version': version,
         }
-        report_result(con, acfile, info)
         msg = 'no imported level0 ac data found for processing file {0} ({1})'.format(acfile, err)  # noqa
+        logger.debug(msg)
+        report_result(con, acfile, info)
         raise Level1BPrepareDataError(msg)
+    logger.debug(
+        "got stw limits {0} to {1} for {2}".format(stw1, stw2, acfile)
+    )
 
     error = preprocess_data(
         acfile, backend, version, con, stw1, stw2, TDIFF, logger, pg_string)
@@ -320,6 +346,7 @@ def job_info_level1b(
 ):
     logging.basicConfig()
     logger = logging.getLogger('level1b get job batch info')
+    logger.setLevel(logging.INFO)
     logger.info('getting job batch info for file {0}'.format(acfile))
 
     if con is None:
@@ -329,6 +356,7 @@ def job_info_level1b(
 
     # find out which scan that starts in the file to calibrate
     try:
+        logger.debug("getting scans for {0}". format(acfile))
         scanstarts = prepare_data.get_scan_starts(stw1, stw2)
     except NoScansError as err:
         info = {
@@ -337,12 +365,15 @@ def job_info_level1b(
             'success_scans': 0,
             'version': version,
         }
-        report_result(con, acfile, info)
         msg = 'no scans found for processing file {0} ({1})'.format(acfile, err)  # noqa
+        logger.debug(msg)
+        report_result(con, acfile, info)
         raise Level1BPrepareDataError(msg)
+    logger.debug("got {0} scans for {1}".format(len(scanstarts), acfile))
 
     # get data to be used in calibration
     sodaversion = prepare_data.get_soda_version(stw1, stw2)
+    logger.debug("got soda version for {0}".format(acfile))
 
     con.close()
 
@@ -362,6 +393,7 @@ def import_level1b(
 
     logging.basicConfig()
     logger = logging.getLogger('level1b process')
+    logger.setLevel(logging.INFO)
     logger.info('processing file {0}'.format(acfile))
 
     firstscan = scanstarts[0]['start']
@@ -372,6 +404,9 @@ def import_level1b(
 
     prepare_data = PrepareData(acfile, backend, version, con, pg_string)
     try:
+        logger.debug(
+            "Will now get data from {0} to {1}".format(firstscan, lastscan)
+        )
         result = prepare_data.get_data_for_calibration(
             firstscan, lastscan, TDIFF, sodaversion,
         )
@@ -382,9 +417,11 @@ def import_level1b(
             'success_scans': 0,
             'version': version,
         }
-        report_result(con, acfile, info)
         msg = 'necessary data not available for processing file {0} ({1})'.format(acfile, err)  # noqa
+        logger.debug(msg)
+        report_result(con, acfile, info)
         raise Level1BPrepareDataError(msg)
+    logger.debug("Got {0} data rows".format(len(result)))
 
     # now loop over the scans
     success_scans = 0
@@ -408,11 +445,20 @@ def import_level1b(
                 scanfrontend,
                 TDIFF,
             )
+            logger.debug(
+                "{0} scans remain for {1} after filter".format(
+                    len(scandata),
+                    scanfrontend,
+                )
+            )
             # now we are ready to start to calibrate
             # spectra for a scan
             if scandata == []:
                 continue
             listofspec = frequency_calibrate(scandata, con)
+            logger.debug(
+                "frequency calibration complete for {0}".format(scanfrontend)
+            )
             if listofspec == []:
                 continue
             intensity_calibrate(
@@ -421,6 +467,9 @@ def import_level1b(
                 row['start'],
                 version,
                 sodaversion,
+            )
+            logger.debug(
+                "intensity calibration complete for {0}".format(scanfrontend)
             )
         scan_ids.append(row["start"])
         success_scans = success_scans + 1

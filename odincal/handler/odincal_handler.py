@@ -1,6 +1,7 @@
 import json
 import os
 import stat
+import logging
 from tempfile import mkdtemp
 
 import boto3
@@ -170,12 +171,22 @@ def setup_postgres():
 
 
 def preprocess_handler(event, context):
+    logging.basicConfig()
+    logger = logging.getLogger('level1b pre-process handler')
+    logger.setLevel(logging.INFO)
+
     version = ODINCAL_VERSION
     ac_file = os.path.split(event["acFile"])[-1]
     backend = event["backend"].upper()
 
+    logger.debug(
+        "setting up postgres before pre-processing of {0}".format(ac_file)
+    )
     pg_string = setup_postgres()
 
+    logger.debug(
+        "checking attitude coverage for {0}".format(ac_file)
+    )
     assert_has_attitude_coverage(
         ac_file,
         backend,
@@ -183,6 +194,9 @@ def preprocess_handler(event, context):
         pg_string,
     )
 
+    logger.debug(
+        "starting pre-processing of {0}".format(ac_file)
+    )
     stw1, stw2 = preprocess_level1b(
         ac_file,
         backend,
@@ -200,6 +214,10 @@ def preprocess_handler(event, context):
 
 
 def get_job_info_handler(event, context):
+    logging.basicConfig()
+    logger = logging.getLogger('level1b job info handler')
+    logger.setLevel(logging.INFO)
+
     version = ODINCAL_VERSION
     ac_file = os.path.split(event["acFile"])[-1]
     backend = event["backend"].upper()
@@ -227,6 +245,10 @@ def get_job_info_handler(event, context):
 
 
 def import_handler(event, context):
+    logging.basicConfig()
+    logger = logging.getLogger('level1b import l1b handler')
+    logger.setLevel(logging.INFO)
+
     version = ODINCAL_VERSION
     ac_file = os.path.split(event["acFile"])[-1]
     backend = event["backend"].upper()
