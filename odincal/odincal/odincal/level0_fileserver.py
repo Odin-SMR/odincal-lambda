@@ -25,7 +25,7 @@ class EventHandler(ProcessEvent):
     """Event handler"""
 
     def __init__(self, queue):
-        self.logger = logging.getLogger('filesystem list')
+        self.logger = logging.getLogger('level1b.filesystem_list')
         self.logger.debug('started filesystem sensor')
         self.queue = queue
         ProcessEvent.__init__(self)

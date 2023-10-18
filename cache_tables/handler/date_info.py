@@ -133,6 +133,11 @@ def handler(event: dict[str, list[int]], context: Any) -> dict[str, Any]:
         date_info[idx]["Scans"] = event["Scans"]
         date_info[idx]["File"] = event["File"]
 
+    if len(date_info) == 0:
+        return {
+            "StatusCode": 204,
+            "DateInfo": [],
+        }
     return {
         "StatusCode": 200,
         "DateInfo": date_info,

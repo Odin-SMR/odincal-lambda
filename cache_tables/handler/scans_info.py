@@ -152,7 +152,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         scans = update_scans(pg_credentials, event)
 
     if len(scans) == 0:
-        return {"StatusCode": 204}
+        return {
+            "StatusCode": 204,
+            "ScansInfo": [],
+        }
 
     scans = [
         {
