@@ -306,7 +306,7 @@ def stw_correction(datafile):
 def import_file(datafile):
     extension = splitext(datafile)[1]
     fgr = StringIO()
-    logger = logging.getLogger('level0 process')
+    logger = logging.getLogger('level0.process')
     logger.info('importing file {0}'.format(datafile))
     if extension == '.ac1' or extension == '.ac2':
         f = ACfile(datafile)

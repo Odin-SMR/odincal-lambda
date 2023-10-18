@@ -222,7 +222,7 @@ def level1b_importer():
     version = int(argv[4])
 
     set_odin_logging()
-    logger = logging.getLogger('level1b process')
+    logger = logging.getLogger('level1b.process')
     logger.info('processing file {0}'.format(acfile))
 
     con = db()

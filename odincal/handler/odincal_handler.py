@@ -172,7 +172,7 @@ def setup_postgres():
 
 def preprocess_handler(event, context):
     logging.basicConfig()
-    logger = logging.getLogger('level1b pre-process handler')
+    logger = logging.getLogger('level1b.pre-process.handler')
     logger.setLevel(logging.INFO)
 
     version = ODINCAL_VERSION
@@ -215,7 +215,7 @@ def preprocess_handler(event, context):
 
 def get_job_info_handler(event, context):
     logging.basicConfig()
-    logger = logging.getLogger('level1b job info handler')
+    logger = logging.getLogger('level1b.job_info.handler')
     logger.setLevel(logging.INFO)
 
     version = ODINCAL_VERSION
@@ -246,7 +246,7 @@ def get_job_info_handler(event, context):
 
 def import_handler(event, context):
     logging.basicConfig()
-    logger = logging.getLogger('level1b import l1b handler')
+    logger = logging.getLogger('level1b.import_l1b.handler')
     logger.setLevel(logging.INFO)
 
     version = ODINCAL_VERSION
