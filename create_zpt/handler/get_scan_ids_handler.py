@@ -7,7 +7,7 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     scans: set[tuple[int, int]] = set()
     for fm in event["ScansInfo"]:
         scans = scans.union(
-            {(scan["ScanID"], fm["FreqMode"]) for scan in fm["ScansInfo"]}
+            {(scan["ScanID"], scan["FreqMode"]) for scan in fm["ScansInfo"]}
         )
 
     if len(scans) == 0:
