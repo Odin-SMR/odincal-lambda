@@ -50,7 +50,6 @@ def extractPTZprofilevarsolar(
         format="parquet",
         filesystem=s3,
     )
-    ds.FileFormat("")
     table = dataset.to_table(
         columns=["DATE", "AP_AVG", "OBS", "OBS_CENTER81"],
         filter=ds.field("DATE") == date_time.date(),
