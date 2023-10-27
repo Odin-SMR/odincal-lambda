@@ -58,7 +58,8 @@ def activate_l2_handler(event: Event, context: Context) -> dict[str, int]:
                 "ScanIDs": event["ScanIDs"],
                 "File": filename,
                 "Backend": event["Backend"],
-            }),
+            }
+        ),
         name=f"{filename}-{create_short_hash()}",
     )
 
