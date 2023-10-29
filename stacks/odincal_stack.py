@@ -9,7 +9,6 @@ from aws_cdk.aws_lambda import (
     DockerImageCode,
     DockerImageFunction,
     Function,
-    InlineCode,
     Runtime,
 )
 from aws_cdk.aws_s3 import Bucket, IBucket
@@ -781,93 +780,43 @@ class OdincalStack(Stack):
 
     def set_up_activate_level2(
         self,
-        lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
-
-        # Set up Lambda functions
-        activate_level2_lambda = Function(
+        map_state = sfn.Map(
             self,
-            "OdinSMROdincalActivateLevel2Lambda",
-            code=InlineCode.from_asset("activate_l2"),
-            handler="handler.activate_l2_handler.activate_l2_handler",
-            timeout=lambda_timeout,
-            architecture=Architecture.X86_64,
-            runtime=Runtime.PYTHON_3_10,
+            f"OdincalArrangeL2",
+            input_path="$..ScansInfo[?(@.FreqMode)]",
+            items_path="$",
+            comment="Filter ScansInfo where FreqMode is present",
+            result_path="$.L2RunInfo",
         )
 
-        activate_level2_lambda.add_to_role_policy(
-            PolicyStatement(
-                actions=[
-                    "states:ListStateMachines",
-                    "states:StartExecution",
-                ],
-                resources=["*"],
+        map_task = sfn.Pass(
+            self,
+            f"OdincalArrangeL2part",
+            parameters={
+                "freqmode.$": "$.FreqMode",
+                "scanid.$": "$.ScanID",
+                "backend.$": "$.Backend",
+            },
+            comment="Picks out relevant info from ScansInfo item",
+        )
+        map_state.iterator(map_task)
+
+        acticate_l2 = tasks.StepFunctionsStartExecution(
+            self,
+            "OdincalStartL2",
+            state_machine=sfn.StateMachine.from_state_machine_name(
+                self, "OdinL2Statemachine", state_machine_name="OdinQSMR"
             ),
+            associate_with_parent=True,
+            input_path="$.L2RunInfo",
+            input=sfn.TaskInput.from_object({"l2_job": sfn.JsonPath.object_at("$")}),
+            comment="Starts L2 state machine",
         )
 
-        # Set up tasks
-        activate_level2_task = tasks.LambdaInvoke(
-            self,
-            "OdinSMROdincalActivateLevel2Task",
-            lambda_function=activate_level2_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "ScansIDs": sfn.JsonPath.list_at(
-                        "$.GetScanIDs.Payload.ScanIDs"
-                    ),
-                    "File": sfn.JsonPath.string_at("$.name"),
-                    "Backend": sfn.JsonPath.string_at("$.type"),
-                },
-            ),
-            result_path="$.ActivateLevel2",
-        )
-        activate_level2_task.add_retry(
-            errors=["States.ALL"],
-            max_attempts=42,
-            backoff_rate=2,
-            interval=Duration.minutes(6),
-            max_delay=Duration.minutes(42),
-            jitter_strategy=sfn.JitterType.FULL,
-        )
+        map_state.next(acticate_l2)
 
-        # Set up workflow
-        activate_level2_fail_state = sfn.Fail(
-            self,
-            "OdinSMRActivateL2Fail",
-            comment="Somthing went wrong when calling Level 2 processing",
-        )
-        activate_level2_success_state = sfn.Succeed(
-            self,
-            "OdinSMRActivateLevel2Success",
-        )
-        activate_level2_not_found_state = sfn.Succeed(
-            self,
-            "OdinSMRActivateLevel2NotFound",
-            comment="State machine for Level 2 not found",
-        )
-        check_activate_level2_status_state = sfn.Choice(
-            self,
-            "OdinSMRActivateLevel2Status",
-        )
-
-        check_activate_level2_status_state.when(
-            sfn.Condition.number_equals(
-                "$.ActivateLevel2.Payload.StatusCode",
-                200,
-            ),
-            activate_level2_success_state,
-        )
-        check_activate_level2_status_state.when(
-            sfn.Condition.number_equals(
-                "$.ActivateLevel2.Payload.StatusCode",
-                404,
-            ),
-            activate_level2_not_found_state,
-        )
-        check_activate_level2_status_state.otherwise(activate_level2_fail_state)
-        activate_level2_task.next(check_activate_level2_status_state)
-
-        return activate_level2_task
+        return map_state
 
     def __init__(
         self,
@@ -875,7 +824,7 @@ class OdincalStack(Stack):
         id: str,
         ssm_root: str,
         lambda_timeout: Duration = Duration.seconds(900),
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
         self.ssm_root = ssm_root
@@ -891,9 +840,7 @@ class OdincalStack(Stack):
             subnet_type=SubnetType.PRIVATE_WITH_EGRESS
         )
 
-        activate_level2_task = self.set_up_activate_level2(
-            lambda_timeout,
-        )
+        activate_level2_task = self.set_up_activate_level2()
 
         # Set up buckets
         psql_bucket = Bucket.from_bucket_name(
