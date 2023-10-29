@@ -783,7 +783,7 @@ class OdincalStack(Stack):
     ) -> sfn.State:
         map_state = sfn.Map(
             self,
-            f"OdincalArrangeL2",
+            "OdincalArrangeL2",
             input_path="$..ScansInfo[?(@.FreqMode)]",
             items_path="$",
             comment="Filter ScansInfo where FreqMode is present",
@@ -792,7 +792,7 @@ class OdincalStack(Stack):
 
         map_task = sfn.Pass(
             self,
-            f"OdincalArrangeL2part",
+            "OdincalArrangeL2part",
             parameters={
                 "freqmode.$": "$.FreqMode",
                 "scanid.$": "$.ScanID",
@@ -810,7 +810,9 @@ class OdincalStack(Stack):
             ),
             associate_with_parent=True,
             input_path="$.L2RunInfo",
-            input=sfn.TaskInput.from_object({"l2_job": sfn.JsonPath.object_at("$")}),
+            input=sfn.TaskInput.from_object(
+                {"l2_job": sfn.JsonPath.object_at("$")}
+            ),
             comment="Starts L2 state machine",
         )
 
