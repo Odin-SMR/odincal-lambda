@@ -3,9 +3,11 @@ import xarray
 from pandas import to_datetime  # type: ignore
 
 from .atmos import intatm, IDEALGAS
-from .msis90 import Msis90 as M90
+from .msis90 import extractPTZprofilevarsolar
 
-
+# fix Msis from 70-150 km with solar effects
+# to ensure an ok stratopause Donal wants to add a 50 km point
+# from msis
 MSISZ = np.r_[49.0, 50.0, 51, np.arange(75, 151, 1)]
 
 
@@ -25,18 +27,13 @@ class Donaletty:
                 newz : heights to interpolate to
         Output : ZPT array [3, 0-120]
         """
-
-        # fix Msis from 70-150 km with solar effects
-        msis = M90()
-        # to ensure an ok stratopause Donal wants to add a 50 km point
-        # from msis
         scan_datetime = to_datetime(scan_data.DateMid.data).to_pydatetime()
-        msisT = msis.extractPTZprofilevarsolar(
+        msisT = extractPTZprofilevarsolar(
             scan_datetime,
             scan_data.LatMid,
             scan_data.LonMid,
             MSISZ,
-        )[1]
+        )["T"]
         z = np.r_[scan_data.era5_gmh.data, MSISZ]
         temp = np.r_[scan_data.era5_t, msisT]
         normrho = (

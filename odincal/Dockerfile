@@ -18,7 +18,10 @@ RUN pip install -r requirements.txt
 
 # Install oops and odincal
 COPY ./oops /oops
+WORKDIR /oops/oops
+RUN gcc -shared -o libfft.so -fPIC ../Library/odinfft.c
 COPY ./odincal /odincal
+WORKDIR ${LAMBDA_TASK_ROOT}
 RUN pip install /oops --target "${LAMBDA_TASK_ROOT}"
 RUN pip install /odincal --target "${LAMBDA_TASK_ROOT}"
 

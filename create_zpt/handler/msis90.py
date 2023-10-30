@@ -18,66 +18,54 @@
 #  MA 02110-1301, USA.
 #
 #
+from datetime import datetime
+from typing import TypedDict
+
 import numpy as np
-import pyarrow.parquet as pq  # type: ignore
+import pyarrow.dataset as ds  # type: ignore
 from nrlmsise00 import msise_model  # type: ignore
 from s3fs import S3FileSystem  # type: ignore
 
 from .atmos import BOLTZMAN
 
+SOLAR_DATA_FILE = "s3://odin-solar/spacedata_observed.parquet"
 
-class Msis90:
-    """class for access to MSIS90e model"""
 
-    def __init__(
-        self,
-        solardatafile="s3://odin-solar/spacedata_observed.parquet",
-    ):
-        self.solardatafile = solardatafile
+class MsisPTZ(TypedDict):
+    P: np.ndarray
+    T: np.ndarray
+    Z: np.ndarray
 
-    def extractPTZprofilevarsolar(self, datetime, lat, lng, altitudes):
-        s3 = S3FileSystem()
-        solardatafile = "s3://odin-solar/spacedata_observed.parquet"
-        table = pq.read_table(
-            solardatafile,
-            columns=["DATE", "AP_AVG", "OBS", "OBS_CENTER81"],
-            filesystem=s3,
+
+def extractPTZprofilevarsolar(
+    date_time: datetime,
+    lat: float,
+    lng: float,
+    altitudes: np.ndarray,
+) -> MsisPTZ:
+    s3 = S3FileSystem()
+    solardatafile = SOLAR_DATA_FILE
+    dataset = ds.dataset(
+        solardatafile,
+        format="parquet",
+        filesystem=s3,
+    )
+    table = dataset.to_table(
+        columns=["DATE", "AP_AVG", "OBS", "OBS_CENTER81"],
+        filter=ds.field("DATE") == date_time.date(),
+    )
+    df = table.to_pandas()
+    apavg, f107, f107a = df.iloc[-1]
+    P = np.zeros(altitudes.shape)
+    T = np.zeros(altitudes.shape)
+    Z = altitudes
+    for i, alt in enumerate(altitudes):
+        dens, temp = msise_model(
+            date_time, alt, lat, lng, f107a, f107, apavg, flags=[1] * 24
         )
-        df = table.to_pandas()
-        apavg, f107, f107a = df.loc[datetime.date().isoformat()]
-        P = np.zeros(altitudes.shape)
-        T = np.zeros(altitudes.shape)
-        Z = altitudes
-        for i, alt in enumerate(altitudes):
-            dens, temp = msise_model(
-                datetime, alt, lat, lng, f107a, f107, apavg, flags=[1] * 24
-            )
-            t = np.array(temp)
-            d = np.array(dens)
-            T[i] = t[1]
-            P[i] = (d.sum() - d[5]) * BOLTZMAN * t[1] / 100.0
+        t = np.array(temp)
+        d = np.array(dens)
+        T[i] = t[1]
+        P[i] = (d.sum() - d[5]) * BOLTZMAN * t[1] / 100.0
 
-        return P, T, Z
-
-    def extractPTZprofilefixedsolar(self, datetime, lat, lng, altitudes):
-        f107 = 100
-        f107a = 100
-        apavg = 4
-        P = np.zeros(altitudes.shape)
-        T = np.zeros(altitudes.shape)
-        Z = altitudes
-        for i, alt in enumerate(altitudes):
-            dens, temp = msise_model(
-                datetime,
-                alt,
-                lat,
-                lng,
-                f107a,
-                f107,
-                apavg,
-            )
-            t = np.array(temp)
-            d = np.array(dens)
-            T[i] = t[1]
-            P[i] = (d.sum() - d[5]) * BOLTZMAN * t[1] / 100.0
-        return P, T, Z
+    return MsisPTZ(P=P, T=T, Z=Z)
