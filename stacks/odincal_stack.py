@@ -783,7 +783,7 @@ class OdincalStack(Stack):
     ) -> sfn.State:
         map_state = sfn.Map(
             self,
-            "OdincalArrangeL2",
+            "OdinSMROdincalArrangeL2",
             input_path="$..ScansInfo[?(@.FreqMode)]",
             items_path="$",
             comment="Filter ScansInfo where FreqMode is present",
@@ -792,7 +792,7 @@ class OdincalStack(Stack):
 
         map_task = sfn.Pass(
             self,
-            "OdincalArrangeL2part",
+            "OdinSMROdincalArrangeL2part",
             parameters={
                 "freqmode.$": "$.FreqMode",
                 "scanid.$": "$.ScanID",
@@ -804,7 +804,7 @@ class OdincalStack(Stack):
 
         acticate_l2 = tasks.StepFunctionsStartExecution(
             self,
-            "OdincalStartL2",
+            "OdinSMROdincalStartL2",
             state_machine=sfn.StateMachine.from_state_machine_name(
                 self, "OdinL2Statemachine", state_machine_name="OdinQSMR"
             ),
