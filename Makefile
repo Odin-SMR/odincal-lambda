@@ -23,7 +23,7 @@ help:
 $(CONSTRAINTS_ENV): $(SOURCES)
 	CONSTRAINTS=/dev/null $(PIP_COMPILE) --strip-extras -o $@ $^ $(DEVELOPER_ENV)
 
-%.txt: %.in 
+%.txt: %.in
 	CONSTRAINTS=$(CURRENT_DIR)/$(CONSTRAINTS_ENV) $(PIP_COMPILE) --no-strip-extras --no-annotate -o $@ $<
 
 all: $(CONSTRAINTS_ENV) $(addsuffix .txt, $(basename $(SOURCES)))

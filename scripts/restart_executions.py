@@ -22,6 +22,7 @@ class State(TypedDict):
 sfn_client = boto3.client("stepfunctions")
 History = NewType[List[State]]
 
+
 def get_history(nmax: int) -> History:
     history: History = []
     paginator = sfn_client.get_paginator("list_executions")
@@ -46,6 +47,7 @@ def get_history(nmax: int) -> History:
                 )
     return history
 
+
 def run_last_failed(hist: History) -> None:
     df = pd.DataFrame.from_dict(hist)
     df.sort_values(by=["job", "date"]).drop_duplicates(subset="job", keep="last")
@@ -58,6 +60,6 @@ def run_last_failed(hist: History) -> None:
         sfn_client.start_execution(stateMachineArn=STATE_MACHINE, input=sfn_input)
 
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     hist = get_history(1000)
     run_last_failed(hist)

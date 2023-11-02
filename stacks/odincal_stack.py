@@ -29,6 +29,7 @@ class OdincalStack(Stack):
         vpc: IVpc,
         vpc_subnets: SubnetSelection,
         psql_bucket: IBucket,
+        logconfig: IStringParameter,
         lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up lambdas:
@@ -38,7 +39,6 @@ class OdincalStack(Stack):
             "ODIN_PG_PASS_SSM_NAME": f"{self.ssm_pg_root}/password",
             "ODIN_PG_DB_SSM_NAME": f"{self.ssm_pg_root}/db",
             "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
-            "ODIN_LOGCONFIG": f"{self.ssm_odincal_root}/logconf",
         }
 
         preprocess_level1_lambda = DockerImageFunction(
@@ -61,7 +61,6 @@ class OdincalStack(Stack):
             actions=["ssm:GetParameter"],
             resources=[
                 f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
-                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
             ]
         ))
 
@@ -85,7 +84,6 @@ class OdincalStack(Stack):
             actions=["ssm:GetParameter"],
             resources=[
                 f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
-                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
             ]
         ))
 
@@ -109,11 +107,14 @@ class OdincalStack(Stack):
             actions=["ssm:GetParameter"],
             resources=[
                 f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
-                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
             ]
         ))
 
         # Set up additional permissions
+        logconfig.grant_read(preprocess_level1_lambda)
+        logconfig.grant_read(get_job_info_level1_lambda)
+        logconfig.grant_read(calibrate_level1_lambda)
+
         psql_bucket.grant_read(preprocess_level1_lambda)
         psql_bucket.grant_read(get_job_info_level1_lambda)
         psql_bucket.grant_read(calibrate_level1_lambda)
@@ -321,7 +322,6 @@ class OdincalStack(Stack):
             actions=["ssm:GetParameter"],
             resources=[
                 f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
-                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
             ]
         ))
 
@@ -343,7 +343,6 @@ class OdincalStack(Stack):
             actions=["ssm:GetParameter"],
             resources=[
                 f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
-                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
             ]
         ))
 
@@ -875,7 +874,7 @@ class OdincalStack(Stack):
     ) -> None:
         super().__init__(scope, id, **kwargs)
         self.ssm_pg_root = ssm_root
-        self.ssm_odincal_root = "/odincal"
+        self.ssm_logconfig = "/odincal/logconf"
 
         # Set up VPC
         vpc = Vpc.from_lookup(
@@ -890,7 +889,7 @@ class OdincalStack(Stack):
         ssm_logconfig = StringParameter.from_string_parameter_name(
             self,
             "OdinSMRLogConfig",
-            string_parameter_name="/odincal/logconf"
+            string_parameter_name=self.ssm_logconfig
         )
 
         activate_level2_task = self.set_up_activate_level2()
@@ -946,6 +945,7 @@ class OdincalStack(Stack):
             vpc,
             vpc_subnets,
             psql_bucket,
+            ssm_logconfig,
             lambda_timeout,
         )
 
