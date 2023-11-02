@@ -7,6 +7,9 @@ from psycopg2.extras import RealDictCursor
 from .odin_connection import odin_connection, setup_postgres
 from .ssm_parameters import get_parameters
 from .time_util import datetime2mjd, mjd2stw, stw2datetime
+from .log_configuration import logconfig
+
+logconfig()
 
 
 def gen_data(db_cursor, query_string: str) -> list[dict]:
@@ -15,9 +18,9 @@ def gen_data(db_cursor, query_string: str) -> list[dict]:
     info_list = []
     for row in result:
         info_dict = {}
-        info_dict['Backend'] = row['backend']
-        info_dict['FreqMode'] = row['freqmode']
-        info_dict['NumScan'] = row['count']
+        info_dict["Backend"] = row["backend"]
+        info_dict["FreqMode"] = row["freqmode"]
+        info_dict["NumScan"] = row["count"]
         info_list.append(info_dict)
     return info_list
 
@@ -88,9 +91,9 @@ def update_measurements(
             add_to_database(
                 db_cursor,
                 current_date,
-                freqmode['FreqMode'],
-                freqmode['NumScan'],
-                freqmode['Backend'],
+                freqmode["FreqMode"],
+                freqmode["NumScan"],
+                freqmode["Backend"],
             )
             freqmode_info.append(
                 {

@@ -5,6 +5,9 @@ from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
+from .log_configuration import logconfig
+
+logconfig()
 
 ZPT_BUCKET = "odin-zpt"
 ZPT_PATTERN = "{backend}/{prefix}/{filename}.parquet"

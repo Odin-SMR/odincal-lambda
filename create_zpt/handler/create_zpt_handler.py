@@ -16,7 +16,9 @@ from .time_util import mjd2datetime
 from .geoloc_tools import get_scan_geo_loc
 from .geos import gmh
 from .scan_data_descriptions import parameter_desc
+from .log_configuration import logconfig
 
+logconfig()
 
 AWS_REGION = "eu-north-1"
 

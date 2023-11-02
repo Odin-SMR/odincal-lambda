@@ -3,5 +3,7 @@ mypy
 pip-tools
 pytest
 tox
-types-boto3
-types-botocore
+boto3-stubs[lambda,stepfunctions,s3]
+types-psycopg2
+types-pyyaml
+types-requests

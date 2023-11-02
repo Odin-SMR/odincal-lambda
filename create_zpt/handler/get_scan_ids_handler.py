@@ -1,6 +1,9 @@
 """Extract just the scan IDs and frequency modes from input
 """
 from typing import Any
+from .log_configuration import logconfig
+
+logconfig()
 
 
 def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
@@ -17,7 +20,5 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         }
     return {
         "StatusCode": 200,
-        "ScanIDs": [
-            {"ScanID": s[0], "FreqMode": s[1]} for s in scans
-        ]
+        "ScanIDs": [{"ScanID": s[0], "FreqMode": s[1]} for s in scans],
     }

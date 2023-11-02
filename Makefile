@@ -15,7 +15,7 @@ PIP_COMPILE := pip-compile -q --no-header --resolver=backtracking
 CONSTRAINTS_ENV := $(addsuffix .txt, $(basename $(DEVELOPER_ENV)))
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 CURRENT_DIR := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
-SOURCES := $(shell find . -name 'requirements*.in' -not -name $(DEVELOPER_ENV) -not -path "*/odincal/*" -not -path "*/cdk.out/*")
+SOURCES := $(shell find . -name 'requirements*.in' -not -name $(DEVELOPER_ENV) -not -path "./odincal/*" -not -path "./cdk.out/*")
 
 help:
 	@sed -rn 's/^## ?//;T;p' $(MAKEFILE_LIST)

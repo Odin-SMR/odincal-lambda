@@ -6,7 +6,6 @@ import pg
 from pg import DB, ProgrammingError
 from sys import stderr, stdout, stdin, argv, exit
 from odin import odin
-from odincal.logclient import set_odin_logging
 from odincal.calibration_preprocess import Prepare_data
 from odincal.frequency_calibration import Spectra
 from odincal.intensity_calibration import Level1b_cal, planck
@@ -221,7 +220,6 @@ def level1b_importer():
     level0_process = int(argv[3])
     version = int(argv[4])
 
-    set_odin_logging()
     logger = logging.getLogger('level1b.process')
     logger.info('processing file {0}'.format(acfile))
 

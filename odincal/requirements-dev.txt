@@ -65,11 +65,15 @@ mockito==1.4.0
 more-itertools==5.0.0
     # via pytest
 numpy==1.15.4
-    # via -r requirements.txt
+    # via
+    #   -r requirements.txt
+    #   pandas
 packaging==20.9
     # via
     #   pytest
     #   tox
+pandas==0.24.2
+    # via -r requirements.txt
 pathlib2==2.3.7.post1
     # via
     #   -r requirements.txt
@@ -103,6 +107,11 @@ python-dateutil==2.8.2
     # via
     #   -r requirements.txt
     #   botocore
+    #   pandas
+pytz==2023.3.post1
+    # via
+    #   -r requirements.txt
+    #   pandas
 s3transfer==0.4.2
     # via
     #   -r requirements.txt

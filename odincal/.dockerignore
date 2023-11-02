@@ -7,4 +7,5 @@ data
 **/scripts
 **/tests
 **/docs
+**/*.pyc
 

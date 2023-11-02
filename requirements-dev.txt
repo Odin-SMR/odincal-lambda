@@ -1,38 +1,49 @@
+aiobotocore==2.7.0
+    # via s3fs
+aiohttp==3.8.6
+    # via
+    #   aiobotocore
+    #   s3fs
+aioitertools==0.11.0
+    # via aiobotocore
+aiosignal==1.3.1
+    # via aiohttp
 asciitree==0.3.3
     # via zarr
+async-timeout==4.0.3
+    # via aiohttp
 attrs==23.1.0
     # via
+    #   aiohttp
     #   cattrs
     #   jsii
-aws-cdk-asset-awscli-v1==2.2.200
+aws-cdk-asset-awscli-v1==2.2.201
     # via aws-cdk-lib
 aws-cdk-asset-kubectl-v20==2.1.2
     # via aws-cdk-lib
 aws-cdk-asset-node-proxy-agent-v6==2.0.1
     # via aws-cdk-lib
-aws-cdk-lib==2.100.0
+aws-cdk-lib==2.103.1
     # via -r requirements.in
 aws-psycopg2==1.3.8
     # via -r cache_tables/requirements.in
-black==23.9.1
+black==23.10.1
     # via -r requirements-dev.in
-boto3==1.28.62
+boto3==1.28.64
     # via -r requirements.in
-boto3-stubs==1.28.62
-    # via types-boto3
-botocore==1.31.62
+boto3-stubs==1.28.76
+    # via -r requirements-dev.in
+botocore==1.31.64
     # via
     #   -r requirements.in
+    #   aiobotocore
     #   boto3
-    #   s3fs
     #   s3transfer
-botocore-stubs==1.31.62
-    # via
-    #   boto3-stubs
-    #   types-botocore
+botocore-stubs==1.31.75
+    # via boto3-stubs
 build==1.0.3
     # via pip-tools
-cachetools==5.3.1
+cachetools==5.3.2
     # via tox
 cattrs==23.1.2
     # via jsii
@@ -40,8 +51,10 @@ certifi==2023.7.22
     # via requests
 chardet==5.2.0
     # via tox
-charset-normalizer==3.3.0
-    # via requests
+charset-normalizer==3.3.2
+    # via
+    #   aiohttp
+    #   requests
 click==8.1.7
     # via
     #   black
@@ -58,14 +71,20 @@ exceptiongroup==1.1.3
     #   pytest
 fasteners==0.19
     # via zarr
-filelock==3.12.4
+filelock==3.13.1
     # via
     #   tox
     #   virtualenv
-fsspec==2023.9.2
+frozenlist==1.4.0
+    # via
+    #   aiohttp
+    #   aiosignal
+fsspec==2023.10.0
     # via s3fs
 idna==3.4
-    # via requests
+    # via
+    #   requests
+    #   yarl
 importlib-resources==6.1.0
     # via jsii
 iniconfig==2.0.0
@@ -74,24 +93,34 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
-jsii==1.90.0
+jsii==1.91.0
     # via
     #   aws-cdk-asset-awscli-v1
     #   aws-cdk-asset-kubectl-v20
     #   aws-cdk-asset-node-proxy-agent-v6
     #   aws-cdk-lib
     #   constructs
-mypy==1.6.0
+multidict==6.0.4
+    # via
+    #   aiohttp
+    #   yarl
+mypy==1.6.1
     # via -r requirements-dev.in
+mypy-boto3-lambda==1.28.63
+    # via boto3-stubs
+mypy-boto3-s3==1.28.55
+    # via boto3-stubs
+mypy-boto3-stepfunctions==1.28.36
+    # via boto3-stubs
 mypy-extensions==1.0.0
     # via
     #   black
     #   mypy
 nrlmsise00==0.1.2
     # via -r create_zpt/requirements.in
-numcodecs==0.12.0
+numcodecs==0.12.1
     # via zarr
-numpy==1.26.0
+numpy==1.26.1
     # via
     #   nrlmsise00
     #   numcodecs
@@ -108,7 +137,7 @@ packaging==23.2
     #   pytest
     #   tox
     #   xarray
-pandas==2.1.1
+pandas==2.1.2
     # via
     #   -r create_zpt/requirements.in
     #   xarray
@@ -133,13 +162,13 @@ publication==0.0.3
     #   aws-cdk-lib
     #   constructs
     #   jsii
-pyarrow==13.0.0
+pyarrow==14.0.0
     # via -r create_zpt/requirements.in
 pyproject-api==1.6.1
     # via tox
 pyproject-hooks==1.0.0
     # via build
-pytest==7.4.2
+pytest==7.4.3
     # via -r requirements-dev.in
 python-dateutil==2.8.2
     # via
@@ -148,9 +177,13 @@ python-dateutil==2.8.2
     #   pandas
 pytz==2023.3.post1
     # via pandas
+pyyaml==6.0.1
+    # via
+    #   -r cache_tables/requirements.in
+    #   -r create_zpt/requirements.in
 requests==2.31.0
     # via -r cache_tables/requirements.in
-s3fs==0.4.2
+s3fs==2023.10.0
     # via -r create_zpt/requirements.in
 s3transfer==0.7.0
     # via boto3
@@ -178,14 +211,18 @@ typeguard==2.13.3
     #   aws-cdk-lib
     #   constructs
     #   jsii
-types-awscrt==0.19.2
+types-awscrt==0.19.7
     # via botocore-stubs
-types-boto3==1.0.2
+types-psycopg2==2.9.21.15
     # via -r requirements-dev.in
-types-botocore==1.0.2
+types-pyyaml==6.0.12.12
+    # via -r requirements-dev.in
+types-requests==2.31.0.6
     # via -r requirements-dev.in
 types-s3transfer==0.7.0
     # via boto3-stubs
+types-urllib3==1.26.25.14
+    # via types-requests
 typing-extensions==4.8.0
     # via
     #   black
@@ -193,19 +230,26 @@ typing-extensions==4.8.0
     #   cattrs
     #   jsii
     #   mypy
+    #   mypy-boto3-lambda
+    #   mypy-boto3-s3
+    #   mypy-boto3-stepfunctions
 tzdata==2023.3
     # via pandas
-urllib3==1.26.17
+urllib3==1.26.18
     # via
     #   -r cache_tables/requirements.in
     #   botocore
     #   requests
-virtualenv==20.24.5
+virtualenv==20.24.6
     # via tox
-wheel==0.41.2
+wheel==0.41.3
     # via pip-tools
-xarray==2023.9.0
+wrapt==1.15.0
+    # via aiobotocore
+xarray==2023.10.1
     # via -r create_zpt/requirements.in
+yarl==1.9.2
+    # via aiohttp
 zarr==2.16.1
     # via -r create_zpt/requirements.in
 

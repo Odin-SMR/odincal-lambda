@@ -25,4 +25,4 @@ lib/
 .tox/
 **/*.xml
 data/level0
-.vscode
+.vscode/

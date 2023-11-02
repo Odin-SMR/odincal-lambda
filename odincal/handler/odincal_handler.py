@@ -5,25 +5,20 @@ import logging
 from tempfile import mkdtemp
 
 import boto3
-from pg import DB
-
-from odincal.calibration_preprocess import PrepareData
+from ac_coverage import assert_acfile_has_data_coverage
+from log_configuration import logconfig
 from odincal.level1b_window_importer2 import (
     preprocess_level1b,
     job_info_level1b,
     import_level1b,
 )
 
+logconfig()
 
-ATT_BUFFER = 16 * 60 * 60 * 24 * 3  # Three day buffer
 ODINCAL_VERSION = 8
 
 
 class InvalidMessage(Exception):
-    pass
-
-
-class BadAttitude(Exception):
     pass
 
 
@@ -61,36 +56,6 @@ def get_env_or_raise(variable_name):
     return var
 
 
-def assert_has_attitude_coverage(
-    ac_file,
-    backend,
-    version,
-    pg_string,
-    buffer=ATT_BUFFER,
-):
-    con = DB(pg_string)
-
-    prepare = PrepareData(ac_file, backend, version, con)
-    ac_stw_start, ac_stw_end = prepare.get_stw_from_acfile()
-
-    query = con.query(
-        "select max(stw) as latest_att_stw from attitude_level0;"
-    )
-    result = query.dictresult()
-
-    con.close()
-
-    if result[0]["latest_att_stw"] - ac_stw_end < buffer:
-        msg = "attitude data with STW {0} not recent enough for {1} with STW {2} to {3} (buffer required: {4})".format(  # noqa
-            result[0]["latest_att_stw"],
-            ac_file,
-            ac_stw_start,
-            ac_stw_end,
-            buffer,
-        )
-        raise BadAttitude(msg)
-
-
 def notify_queue(
     sqs_client,
     notification_queue,
@@ -98,9 +63,11 @@ def notify_queue(
 ):
     response = sqs_client.send_message(
         QueueUrl=notification_queue,
-        MessageBody=json.dumps({
-            "scans": scans,
-        }),
+        MessageBody=json.dumps(
+            {
+                "scans": scans,
+            }
+        ),
     )
     if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
         msg = "Notification failed for scans {0} with status {1}".format(
@@ -118,7 +85,7 @@ def setup_postgres():
     psql_bucket = get_env_or_raise("ODIN_PSQL_BUCKET_NAME")
 
     psql_dir = mkdtemp()
-    s3_client = boto3.client('s3')
+    s3_client = boto3.client("s3")
 
     # Setup SSL for Postgres
     pg_cert_path = download_file(
@@ -148,19 +115,27 @@ def setup_postgres():
     db_host = ssm_client.get_parameter(
         Name=pg_host_ssm_name,
         WithDecryption=True,
-    )["Parameter"]["Value"]
+    )[
+        "Parameter"
+    ]["Value"]
     db_user = ssm_client.get_parameter(
         Name=pg_user_ssm_name,
         WithDecryption=True,
-    )["Parameter"]["Value"]
+    )[
+        "Parameter"
+    ]["Value"]
     db_pass = ssm_client.get_parameter(
         Name=pg_pass_ssm_name,
         WithDecryption=True,
-    )["Parameter"]["Value"]
+    )[
+        "Parameter"
+    ]["Value"]
     db_name = ssm_client.get_parameter(
         Name=pg_db_ssm_name,
         WithDecryption=True,
-    )["Parameter"]["Value"]
+    )[
+        "Parameter"
+    ]["Value"]
 
     return "host={0} user={1} password={2} dbname={3} sslmode=verify-ca".format(  # noqa: E501
         db_host,
@@ -171,32 +146,19 @@ def setup_postgres():
 
 
 def preprocess_handler(event, context):
-    logging.basicConfig()
-    logger = logging.getLogger('level1b.pre-process.handler')
-    logger.setLevel(logging.INFO)
+    logger = logging.getLogger("level1b.pre-process.handler")
 
     version = ODINCAL_VERSION
     ac_file = os.path.split(event["acFile"])[-1]
     backend = event["backend"].upper()
 
-    logger.debug(
-        "setting up postgres before pre-processing of {0}".format(ac_file)
-    )
+    logger.debug("setting up postgres before pre-processing of {0}".format(ac_file))
     pg_string = setup_postgres()
 
-    logger.debug(
-        "checking attitude coverage for {0}".format(ac_file)
-    )
-    assert_has_attitude_coverage(
-        ac_file,
-        backend,
-        version,
-        pg_string,
-    )
+    logger.debug("checking attitude coverage for {0}".format(ac_file))
+    assert_acfile_has_data_coverage(ac_file, backend, pg_string)
 
-    logger.debug(
-        "starting pre-processing of {0}".format(ac_file)
-    )
+    logger.debug("starting pre-processing of {0}".format(ac_file))
     stw1, stw2 = preprocess_level1b(
         ac_file,
         backend,
@@ -214,10 +176,8 @@ def preprocess_handler(event, context):
 
 
 def get_job_info_handler(event, context):
-    logging.basicConfig()
-    logger = logging.getLogger('level1b.job_info.handler')
-    logger.setLevel(logging.INFO)
-
+    logger = logging.getLogger("level1b.job_info.handler")
+    logger.debug("starting job info handler")
     version = ODINCAL_VERSION
     ac_file = os.path.split(event["acFile"])[-1]
     backend = event["backend"].upper()
@@ -245,9 +205,8 @@ def get_job_info_handler(event, context):
 
 
 def import_handler(event, context):
-    logging.basicConfig()
-    logger = logging.getLogger('level1b.import_l1b.handler')
-    logger.setLevel(logging.INFO)
+    logger = logging.getLogger("level1b.import_l1b.handler")
+    logger.debug("stating import handler")
 
     version = ODINCAL_VERSION
     ac_file = os.path.split(event["acFile"])[-1]
@@ -265,7 +224,7 @@ def import_handler(event, context):
         version,
         pg_string=pg_string,
     )
-    
+
     return {
         "StatusCode": 200,
         "Scans": scans,

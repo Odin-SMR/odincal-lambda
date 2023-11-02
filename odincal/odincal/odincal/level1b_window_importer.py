@@ -11,7 +11,6 @@ from odincal.ac_level1a_importer import ac_level1a_importer
 from odincal.att_level1_importer import att_level1_importer
 from odincal.shk_level1_importer import shk_level1_importer
 import logging
-from odincal.logclient import set_odin_logging
 
 
 class db(DB):
@@ -847,7 +846,6 @@ def level1b_importer():
     ss = int(argv[3])
     version = int(argv[4])
     con = db()
-    set_odin_logging()
     logger = logging.getLogger('level1b.process')
     logger.info('processing file {0}'.format(acfile))
     print acfile
