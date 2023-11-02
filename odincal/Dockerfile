@@ -14,17 +14,17 @@ RUN yum install python27-devel -y
 COPY get-pip.py .
 RUN python get-pip.py
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
 # Install oops and odincal
 COPY ./oops /oops
 WORKDIR /oops/oops
 RUN gcc -shared -o libfft.so -fPIC ../Library/odinfft.c
-COPY ./odincal /odincal
 WORKDIR ${LAMBDA_TASK_ROOT}
-RUN pip install /oops --target "${LAMBDA_TASK_ROOT}"
-RUN pip install /odincal --target "${LAMBDA_TASK_ROOT}"
+COPY ./odincal /odincal
+RUN PYTHONPATH="${LAMBDA_TASK_ROOT}" pip install /oops --target "${LAMBDA_TASK_ROOT}"
+RUN PYTHONPATH="${LAMBDA_TASK_ROOT}" pip install /odincal --target "${LAMBDA_TASK_ROOT}"
 
 # Setup handler
-COPY ./handler ${LAMBDA_TASK_ROOT}/handler
-CMD [ "handler.odincal_handler.import_handler" ]
+COPY ./handler ${LAMBDA_TASK_ROOT}
+CMD [ "odincal_handler.import_handler" ]

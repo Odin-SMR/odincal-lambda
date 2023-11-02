@@ -1,7 +1,9 @@
 """Extract just the scan IDs and frequency modes from input
 """
 from typing import Any
+from .log_configuration import logconfig
 
+logconfig()
 
 def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     scans: set[tuple[int, int]] = set()

@@ -5,3 +5,4 @@ xarray
 s3fs
 nrlmsise00
 scipy
+pyyaml

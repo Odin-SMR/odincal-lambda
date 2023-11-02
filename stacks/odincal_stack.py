@@ -1,6 +1,7 @@
 from aws_cdk import Duration, Stack
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
+from aws_cdk.aws_ssm import StringParameter
 from aws_cdk.aws_ec2 import Vpc, IVpc, SubnetSelection, SubnetType
 from aws_cdk.aws_iam import Effect, PolicyStatement
 from aws_cdk.aws_lambda import (
@@ -32,11 +33,12 @@ class OdincalStack(Stack):
     ) -> sfn.State:
         # Set up lambdas:
         environment = {
-            "ODIN_PG_HOST_SSM_NAME": f"{self.ssm_root}/host",
-            "ODIN_PG_USER_SSM_NAME": f"{self.ssm_root}/user",
-            "ODIN_PG_PASS_SSM_NAME": f"{self.ssm_root}/password",
-            "ODIN_PG_DB_SSM_NAME": f"{self.ssm_root}/db",
+            "ODIN_PG_HOST_SSM_NAME": f"{self.ssm_pg_root}/host",
+            "ODIN_PG_USER_SSM_NAME": f"{self.ssm_pg_root}/user",
+            "ODIN_PG_PASS_SSM_NAME": f"{self.ssm_pg_root}/password",
+            "ODIN_PG_DB_SSM_NAME": f"{self.ssm_pg_root}/db",
             "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
+            "ODIN_LOGCONFIG" : f"{self.ssm_odincal_root}/logconf",
         }
 
         preprocess_level1_lambda = DockerImageFunction(
@@ -44,7 +46,7 @@ class OdincalStack(Stack):
             "OdinSMROdincalPreProcessLambda",
             code=DockerImageCode.from_image_asset(
                 "./odincal",
-                cmd=["handler.odincal_handler.preprocess_handler"],
+                cmd=["odincal_handler.preprocess_handler"],
             ),
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -52,11 +54,15 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             memory_size=2048,
             environment=environment,
+            function_name="OdincalPreprocess",
         )
         preprocess_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
+            resources=[
+                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
+            ]
         ))
 
         get_job_info_level1_lambda = DockerImageFunction(
@@ -64,7 +70,7 @@ class OdincalStack(Stack):
             "OdinSMROdincalGetJobInfoLambda",
             code=DockerImageCode.from_image_asset(
                 "./odincal",
-                cmd=["handler.odincal_handler.get_job_info_handler"],
+                cmd=["odincal_handler.get_job_info_handler"],
             ),
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -72,11 +78,15 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             memory_size=2048,
             environment=environment,
+            function_name="OdincalGetJobInfo",
         )
         get_job_info_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
+            resources=[
+                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
+            ]
         ))
 
         calibrate_level1_lambda = DockerImageFunction(
@@ -84,7 +94,7 @@ class OdincalStack(Stack):
             "OdinSMROdincalLambda",
             code=DockerImageCode.from_image_asset(
                 "./odincal",
-                cmd=["handler.odincal_handler.import_handler"],
+                cmd=["odincal_handler.import_handler"],
             ),
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -92,11 +102,15 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             memory_size=2048,
             environment=environment,
+            function_name="OdincalImportL1B",
         )
         calibrate_level1_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
+            resources=[
+                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
+            ]
         ))
 
         # Set up additional permissions
@@ -118,12 +132,20 @@ class OdincalStack(Stack):
             result_path="$.PreprocessLevel1",
         )
         preprocess_level1_task.add_retry(
-            errors=["BadAttitude"],
+            errors=["MissingAttitude"],
             max_attempts=4,
             backoff_rate=2,
             interval=Duration.days(3),
-            max_delay=Duration.days(14),
-            jitter_strategy=sfn.JitterType.FULL,
+            max_delay=Duration.days(7),
+            jitter_strategy=sfn.JitterType.NONE,
+        )
+        preprocess_level1_task.add_retry(
+            errors=["MissingSHK", "MissingACNeighbours"],
+            max_attempts=4,
+            backoff_rate=2,
+            interval=Duration.days(1),
+            max_delay=Duration.days(4),
+            jitter_strategy=sfn.JitterType.NONE,
         )
         preprocess_level1_task.add_retry(
             errors=["States.ALL"],
@@ -265,6 +287,7 @@ class OdincalStack(Stack):
         vpc: IVpc,
         vpc_subnets: SubnetSelection,
         psql_bucket: IBucket,
+        logconfig: StringParameter,
         lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up lambdas:
@@ -291,11 +314,15 @@ class OdincalStack(Stack):
             memory_size=1024,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
+            function_name="OdincalDateInfo",
         )
         date_info_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
+            resources=[
+                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
+            ]
         ))
 
         scans_info_lambda = Function(
@@ -309,14 +336,21 @@ class OdincalStack(Stack):
             memory_size=1024,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
+            function_name="OdincalScansInfo",
         )
         scans_info_lambda.add_to_role_policy(PolicyStatement(
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:*:*:parameter{self.ssm_root}/*"]
+            resources=[
+                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{self.ssm_odincal_root}/*"
+            ]
         ))
 
         # Set up additional permissions
+        logconfig.grant_read(date_info_lambda)
+        logconfig.grant_read(scans_info_lambda)
+
         psql_bucket.grant_read(date_info_lambda)
         psql_bucket.grant_read(scans_info_lambda)
 
@@ -457,6 +491,7 @@ class OdincalStack(Stack):
         solar_bucket: IBucket,
         era5_bucket: IBucket,
         zpt_bucket: IBucket,
+        logconfig: StringParameter,
         lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up Lambda functions
@@ -469,6 +504,7 @@ class OdincalStack(Stack):
             ),
             timeout=lambda_timeout,
             architecture=Architecture.X86_64,
+            function_name="OdinZPTGetScanIDs",
         )
 
         check_zpt_lambda = DockerImageFunction(
@@ -482,6 +518,7 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
+            function_name="OdinZPTCheckZPT",
         )
 
         check_era5_lambda = DockerImageFunction(
@@ -495,6 +532,7 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
+            function_name="OdinZPTCheckERA5",
         )
 
         check_solar_lambda = DockerImageFunction(
@@ -508,6 +546,7 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
+            function_name="OdinZPTCheckSolar",
         )
 
         create_zpt_lambda = DockerImageFunction(
@@ -522,9 +561,15 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             memory_size=2048,
+            function_name="OdinZPTCreateZPT",
         )
 
         # Set up additional permissions
+        logconfig.grant_read(get_scan_ids_lambda)
+        logconfig.grant_read(check_zpt_lambda)
+        logconfig.grant_read(check_era5_lambda)
+        logconfig.grant_read(check_solar_lambda)
+        logconfig.grant_read(create_zpt_lambda)
         solar_bucket.grant_read(check_solar_lambda)
         solar_bucket.grant_read(create_zpt_lambda)
 
@@ -829,7 +874,8 @@ class OdincalStack(Stack):
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
-        self.ssm_root = ssm_root
+        self.ssm_pg_root = ssm_root
+        self.ssm_odincal_root = "/odincal"
 
         # Set up VPC
         vpc = Vpc.from_lookup(
@@ -840,6 +886,11 @@ class OdincalStack(Stack):
         )
         vpc_subnets = SubnetSelection(
             subnet_type=SubnetType.PRIVATE_WITH_EGRESS
+        )
+        ssm_logconfig = StringParameter.from_string_parameter_name(
+            self,
+            "OdinSMRLogConfig",
+            string_parameter_name="/odincal/logconf"
         )
 
         activate_level2_task = self.set_up_activate_level2()
@@ -877,6 +928,7 @@ class OdincalStack(Stack):
             solar_bucket,
             era5_bucket,
             zpt_bucket,
+            ssm_logconfig,
             lambda_timeout,
         )
 
@@ -885,6 +937,7 @@ class OdincalStack(Stack):
             vpc,
             vpc_subnets,
             psql_bucket,
+            ssm_logconfig,
             lambda_timeout,
         )
 

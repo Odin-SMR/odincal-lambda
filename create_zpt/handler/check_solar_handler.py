@@ -8,7 +8,9 @@ from pyarrow import dataset as ds  # type: ignore
 from pyarrow.fs import FileSystem, S3FileSystem  # type: ignore
 
 from .time_util import mjd2datetime
+from .log_configuration import logconfig
 
+logconfig()
 
 SOLAR_BUCKET = "odin-solar"
 SOLAR_DB = "spacedata_observed.parquet"

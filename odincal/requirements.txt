@@ -27,6 +27,10 @@ jmespath==0.10.0
     #   boto3
     #   botocore
 numpy==1.15.4
+    # via
+    #   -r requirements.in
+    #   pandas
+pandas==0.24.2
     # via -r requirements.in
 pathlib2==2.3.7.post1
     # via importlib-metadata
@@ -37,7 +41,13 @@ pygresql==5.2.4
 pyinotify==0.9.6
     # via -r requirements.in
 python-dateutil==2.8.2
-    # via botocore
+    # via
+    #   botocore
+    #   pandas
+pytz==2023.3.post1
+    # via pandas
+pyyaml==5.4.1
+    # via -r requirements.in
 s3transfer==0.4.2
     # via boto3
 scandir==1.10.0

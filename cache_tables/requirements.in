@@ -1,3 +1,4 @@
 urllib3<2
 requests
 aws-psycopg2
+pyyaml

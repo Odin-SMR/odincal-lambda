@@ -218,9 +218,7 @@ def preprocess_data(acfile, backend, version, con, stw1, stw2, tdiff, logger, pg
     """prepara data for calibration, i.e import data
        to database tables"""
 
-    logging.basicConfig()
     logger = logging.getLogger('level1b.pre-process.pre-process')
-    logger.setLevel(logging.INFO)
     logger.info('actually pre-processing file {0}'.format(acfile))
 
     prepare_data = PrepareData(acfile, backend, version, con, pg_string)
@@ -293,9 +291,7 @@ def preprocess_level1b(
 ):
     '''perform preprocessing'''
 
-    logging.basicConfig()
     logger = logging.getLogger('level1b.pre-process')
-    logger.setLevel(logging.INFO)
     logger.info('pre-processing file {0}'.format(acfile))
 
     if con is None:
@@ -344,9 +340,7 @@ def job_info_level1b(
     con=None,
     pg_string=None,
 ):
-    logging.basicConfig()
     logger = logging.getLogger('level1b.job_info')
-    logger.setLevel(logging.INFO)
     logger.info('getting job batch info for file {0}'.format(acfile))
 
     if con is None:
@@ -391,9 +385,7 @@ def import_level1b(
 ):
     '''intensity and frequency calibration'''
 
-    logging.basicConfig()
     logger = logging.getLogger('level1b.import_l1b')
-    logger.setLevel(logging.INFO)
     logger.info('processing file {0}'.format(acfile))
 
     firstscan = scanstarts[0]['start']

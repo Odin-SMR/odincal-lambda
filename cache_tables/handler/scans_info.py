@@ -7,7 +7,9 @@ from requests.exceptions import HTTPError, RequestException
 
 from .odin_connection import odin_connection, setup_postgres
 from .ssm_parameters import get_parameters
+from .log_configuration import logconfig
 
+logconfig()
 
 API_BASE = "https://odin-smr.org"
 MAX_RETRIES = 3

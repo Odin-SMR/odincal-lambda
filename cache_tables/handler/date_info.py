@@ -7,7 +7,9 @@ from psycopg2.extras import RealDictCursor
 from .odin_connection import odin_connection, setup_postgres
 from .ssm_parameters import get_parameters
 from .time_util import datetime2mjd, mjd2stw, stw2datetime
+from .log_configuration import logconfig
 
+logconfig()
 
 def gen_data(db_cursor, query_string: str) -> list[dict]:
     db_cursor.execute(query_string)

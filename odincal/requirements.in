@@ -5,3 +5,5 @@ PyGreSQL
 pyinotify
 SQLAlchemy
 boto3
+pandas==0.24.2
+pyyaml

@@ -8,7 +8,9 @@ from botocore.exceptions import ClientError
 
 from .era5_dataset import ERA5_BUCKET, ERA5_PATTERN
 from .time_util import mjd2datetime
+from .log_configuration import logconfig
 
+logconfig()
 
 class NoERA5DataError(Exception):
     pass
