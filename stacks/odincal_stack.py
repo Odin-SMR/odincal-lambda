@@ -22,6 +22,7 @@ ERA5_BUCKET_NAME = "odin-era5"
 ZPT_BUCKET_NAME = "odin-zpt"
 LOG_CONFIG_PARAMETER = "/odincal/logconf"
 
+
 class OdincalStack(Stack):
     def set_up_calibration(
         self,
