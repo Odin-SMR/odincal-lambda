@@ -1,7 +1,7 @@
 from aws_cdk import Duration, Stack
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
-from aws_cdk.aws_ssm import StringParameter
+from aws_cdk.aws_ssm import IStringParameter, StringParameter
 from aws_cdk.aws_ec2 import Vpc, IVpc, SubnetSelection, SubnetType
 from aws_cdk.aws_iam import Effect, PolicyStatement
 from aws_cdk.aws_lambda import (
@@ -38,7 +38,7 @@ class OdincalStack(Stack):
             "ODIN_PG_PASS_SSM_NAME": f"{self.ssm_pg_root}/password",
             "ODIN_PG_DB_SSM_NAME": f"{self.ssm_pg_root}/db",
             "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
-            "ODIN_LOGCONFIG" : f"{self.ssm_odincal_root}/logconf",
+            "ODIN_LOGCONFIG": f"{self.ssm_odincal_root}/logconf",
         }
 
         preprocess_level1_lambda = DockerImageFunction(
@@ -287,7 +287,7 @@ class OdincalStack(Stack):
         vpc: IVpc,
         vpc_subnets: SubnetSelection,
         psql_bucket: IBucket,
-        logconfig: StringParameter,
+        logconfig: IStringParameter,
         lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up lambdas:
@@ -491,7 +491,7 @@ class OdincalStack(Stack):
         solar_bucket: IBucket,
         era5_bucket: IBucket,
         zpt_bucket: IBucket,
-        logconfig: StringParameter,
+        logconfig: IStringParameter,
         lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up Lambda functions

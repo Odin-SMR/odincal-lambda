@@ -38,26 +38,32 @@ def add_to_database(
     """Add an entry to the database, update if necessary"""
 
     cursor.execute(
-        'insert into scans_cache '
-        'values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-        'on conflict(date, freqmode, scanid) '
-        'do update set '
-        'altend=EXCLUDED.altend, altstart=EXCLUDED.altstart, '
-        'latend=EXCLUDED.latend, latstart=EXCLUDED.latstart, '
-        'lonend=EXCLUDED.lonend, lonstart=EXCLUDED.lonstart, '
-        'mjdend=EXCLUDED.mjdend, mjdstart=EXCLUDED.mjdstart, '
-        'numspec=EXCLUDED.numspec, '
-        'sunzd=EXCLUDED.sunzd, '
-        'datetime=EXCLUDED.datetime, '
-        'created=EXCLUDED.created, '
-        'quality=EXCLUDED.quality ',
+        "insert into scans_cache "
+        "values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        "on conflict(date, freqmode, scanid) "
+        "do update set "
+        "altend=EXCLUDED.altend, altstart=EXCLUDED.altstart, "
+        "latend=EXCLUDED.latend, latstart=EXCLUDED.latstart, "
+        "lonend=EXCLUDED.lonend, lonstart=EXCLUDED.lonstart, "
+        "mjdend=EXCLUDED.mjdend, mjdstart=EXCLUDED.mjdstart, "
+        "numspec=EXCLUDED.numspec, "
+        "sunzd=EXCLUDED.sunzd, "
+        "datetime=EXCLUDED.datetime, "
+        "created=EXCLUDED.created, "
+        "quality=EXCLUDED.quality ",
         (
             day,
-            freqmode, backend, scanid,
-            altend, altstart,
-            latend, latstart,
-            lonend, lonstart,
-            mjdend, mjdstart,
+            freqmode,
+            backend,
+            scanid,
+            altend,
+            altstart,
+            latend,
+            latstart,
+            lonend,
+            lonstart,
+            mjdend,
+            mjdstart,
             numspec,
             sunzd,
             datetime_i,
@@ -80,9 +86,7 @@ def get_odin_data(
         response = requests.get(url, timeout=365)
         response.raise_for_status()
     except (HTTPError, RequestException) as msg:
-        raise RetriesExhaustedError(
-            f"Retries exhausted for {url} ({msg})"
-        )
+        raise RetriesExhaustedError(f"Retries exhausted for {url} ({msg})")
     return response.json()
 
 
@@ -90,8 +94,7 @@ def update_scans(
     pg_credentials,
     date_info: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Populate database with 'cached' scans for each day.
-    """
+    """Populate database with 'cached' scans for each day."""
 
     all_scans = []
     freqmode = date_info["FreqMode"]
@@ -110,8 +113,8 @@ def update_scans(
             add_to_database(
                 db_cursor,
                 dt.date.fromisoformat(date_str),
-                date_info['FreqMode'],
-                date_info['Backend'],
+                date_info["FreqMode"],
+                date_info["Backend"],
                 scan["AltEnd"],
                 scan["AltStart"],
                 scan["DateTime"],

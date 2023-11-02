@@ -11,15 +11,16 @@ from .log_configuration import logconfig
 
 logconfig()
 
+
 def gen_data(db_cursor, query_string: str) -> list[dict]:
     db_cursor.execute(query_string)
     result = db_cursor.fetchall()
     info_list = []
     for row in result:
         info_dict = {}
-        info_dict['Backend'] = row['backend']
-        info_dict['FreqMode'] = row['freqmode']
-        info_dict['NumScan'] = row['count']
+        info_dict["Backend"] = row["backend"]
+        info_dict["FreqMode"] = row["freqmode"]
+        info_dict["NumScan"] = row["count"]
         info_list.append(info_dict)
     return info_list
 
@@ -90,9 +91,9 @@ def update_measurements(
             add_to_database(
                 db_cursor,
                 current_date,
-                freqmode['FreqMode'],
-                freqmode['NumScan'],
-                freqmode['Backend'],
+                freqmode["FreqMode"],
+                freqmode["NumScan"],
+                freqmode["Backend"],
             )
             freqmode_info.append(
                 {

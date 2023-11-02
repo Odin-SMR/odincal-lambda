@@ -5,6 +5,7 @@ from .log_configuration import logconfig
 
 logconfig()
 
+
 def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     scans: set[tuple[int, int]] = set()
     for fm in event["ScansInfo"]:
@@ -19,7 +20,5 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         }
     return {
         "StatusCode": 200,
-        "ScanIDs": [
-            {"ScanID": s[0], "FreqMode": s[1]} for s in scans
-        ]
+        "ScanIDs": [{"ScanID": s[0], "FreqMode": s[1]} for s in scans],
     }

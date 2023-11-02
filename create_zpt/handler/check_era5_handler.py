@@ -12,6 +12,7 @@ from .log_configuration import logconfig
 
 logconfig()
 
+
 class NoERA5DataError(Exception):
     pass
 
@@ -28,7 +29,7 @@ def assert_era5_exists(
                 year=date.year,
                 month=date.month,
                 date=date.isoformat(),
-            )
+            ),
         )
     except ClientError as err:
         raise NoERA5DataError(f"No ERA5 data found for {date} ({err})")
@@ -39,9 +40,7 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     for fm in event["ScansInfo"]:
         dates = dates.union(
             {mjd2datetime(scan["MJDStart"]).date() for scan in fm["ScansInfo"]}
-        ).union(
-            {mjd2datetime(scan["MJDEnd"]).date() for scan in fm["ScansInfo"]}
-        )
+        ).union({mjd2datetime(scan["MJDEnd"]).date() for scan in fm["ScansInfo"]})
 
     s3_client = boto3.resource("s3")
     for date in dates:
