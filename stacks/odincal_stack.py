@@ -20,7 +20,7 @@ PSQL_BUCKET_NAME = "odin-psql"
 SOLAR_BUCKET_NAME = "odin-solar"
 ERA5_BUCKET_NAME = "odin-era5"
 ZPT_BUCKET_NAME = "odin-zpt"
-
+LOG_CONFIG_PARAMETER = "/odincal/logconf"
 
 class OdincalStack(Stack):
     def set_up_calibration(
@@ -874,7 +874,6 @@ class OdincalStack(Stack):
     ) -> None:
         super().__init__(scope, id, **kwargs)
         self.ssm_pg_root = ssm_root
-        self.ssm_logconfig = "/odincal/logconf"
 
         # Set up VPC
         vpc = Vpc.from_lookup(
@@ -889,7 +888,7 @@ class OdincalStack(Stack):
         ssm_logconfig = StringParameter.from_string_parameter_name(
             self,
             "OdinSMRLogConfig",
-            string_parameter_name=self.ssm_logconfig
+            string_parameter_name=LOG_CONFIG_PARAMETER
         )
 
         activate_level2_task = self.set_up_activate_level2()
