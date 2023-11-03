@@ -10,7 +10,6 @@ app = App()
 OdincalStack(
     app,
     "OdinSMROdincalStack",
-    ssm_root="/odin/psql",
     env=env_EU,
 )
 
