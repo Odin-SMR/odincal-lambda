@@ -20,7 +20,9 @@ PSQL_BUCKET_NAME = "odin-psql"
 SOLAR_BUCKET_NAME = "odin-solar"
 ERA5_BUCKET_NAME = "odin-era5"
 ZPT_BUCKET_NAME = "odin-zpt"
-LOG_CONFIG_PARAMETER = "/odincal/logconf"
+LOG_CONFIG_SSM = "/odincal/logconf"
+PG_ROOT_SSM = "/odin/psql",
+LAMBDA_TIMEOUT = Duration.seconds(900)
 
 
 class OdincalStack(Stack):
@@ -31,14 +33,13 @@ class OdincalStack(Stack):
         vpc_subnets: SubnetSelection,
         psql_bucket: IBucket,
         logconfig: IStringParameter,
-        lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up lambdas:
         environment = {
-            "ODIN_PG_HOST_SSM_NAME": f"{self.ssm_pg_root}/host",
-            "ODIN_PG_USER_SSM_NAME": f"{self.ssm_pg_root}/user",
-            "ODIN_PG_PASS_SSM_NAME": f"{self.ssm_pg_root}/password",
-            "ODIN_PG_DB_SSM_NAME": f"{self.ssm_pg_root}/db",
+            "ODIN_PG_HOST_SSM_NAME": f"{PG_ROOT_SSM}/host",
+            "ODIN_PG_USER_SSM_NAME": f"{PG_ROOT_SSM}/user",
+            "ODIN_PG_PASS_SSM_NAME": f"{PG_ROOT_SSM}/password",
+            "ODIN_PG_DB_SSM_NAME": f"{PG_ROOT_SSM}/db",
             "ODIN_PSQL_BUCKET_NAME": PSQL_BUCKET_NAME,
         }
 
@@ -51,7 +52,7 @@ class OdincalStack(Stack):
             ),
             vpc=vpc,
             vpc_subnets=vpc_subnets,
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             memory_size=2048,
             environment=environment,
@@ -61,7 +62,7 @@ class OdincalStack(Stack):
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
             resources=[
-                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
             ]
         ))
 
@@ -74,7 +75,7 @@ class OdincalStack(Stack):
             ),
             vpc=vpc,
             vpc_subnets=vpc_subnets,
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             memory_size=2048,
             environment=environment,
@@ -84,7 +85,7 @@ class OdincalStack(Stack):
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
             resources=[
-                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
             ]
         ))
 
@@ -97,7 +98,7 @@ class OdincalStack(Stack):
             ),
             vpc=vpc,
             vpc_subnets=vpc_subnets,
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             memory_size=2048,
             environment=environment,
@@ -107,7 +108,7 @@ class OdincalStack(Stack):
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
             resources=[
-                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
             ]
         ))
 
@@ -290,7 +291,6 @@ class OdincalStack(Stack):
         vpc_subnets: SubnetSelection,
         psql_bucket: IBucket,
         logconfig: IStringParameter,
-        lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up lambdas:
         code = Code.from_asset(
@@ -310,7 +310,7 @@ class OdincalStack(Stack):
             "OdinSMROdincalDateInfoLambda",
             code=code,
             handler="handler.date_info.handler",
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
             memory_size=1024,
@@ -322,7 +322,7 @@ class OdincalStack(Stack):
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
             resources=[
-                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
             ]
         ))
 
@@ -331,7 +331,7 @@ class OdincalStack(Stack):
             "OdinSMROdincalScansInfoLambda",
             code=code,
             handler="handler.scans_info.handler",
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
             memory_size=1024,
@@ -343,7 +343,7 @@ class OdincalStack(Stack):
             effect=Effect.ALLOW,
             actions=["ssm:GetParameter"],
             resources=[
-                f"arn:aws:ssm:*:*:parameter{self.ssm_pg_root}/*",
+                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
             ]
         ))
 
@@ -492,7 +492,6 @@ class OdincalStack(Stack):
         era5_bucket: IBucket,
         zpt_bucket: IBucket,
         logconfig: IStringParameter,
-        lambda_timeout: Duration = Duration.seconds(900),
     ) -> sfn.State:
         # Set up Lambda functions
         get_scan_ids_lambda = DockerImageFunction(
@@ -502,7 +501,7 @@ class OdincalStack(Stack):
                 "./create_zpt",
                 cmd=["handler.get_scan_ids_handler.handler"],
             ),
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             function_name="OdinZPTGetScanIDs",
         )
@@ -514,7 +513,7 @@ class OdincalStack(Stack):
                 "./create_zpt",
                 cmd=["handler.check_zpt_handler.handler"],
             ),
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -528,7 +527,7 @@ class OdincalStack(Stack):
                 "./create_zpt",
                 cmd=["handler.check_era5_handler.handler"],
             ),
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -542,7 +541,7 @@ class OdincalStack(Stack):
                 "./create_zpt",
                 cmd=["handler.check_solar_handler.handler"],
             ),
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -556,7 +555,7 @@ class OdincalStack(Stack):
                 "./create_zpt",
                 cmd=["handler.create_zpt_handler.handler"],
             ),
-            timeout=lambda_timeout,
+            timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -869,12 +868,9 @@ class OdincalStack(Stack):
         self,
         scope: Construct,
         id: str,
-        ssm_root: str,
-        lambda_timeout: Duration = Duration.seconds(900),
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
-        self.ssm_pg_root = ssm_root
 
         # Set up VPC
         vpc = Vpc.from_lookup(
@@ -889,7 +885,7 @@ class OdincalStack(Stack):
         ssm_logconfig = StringParameter.from_string_parameter_name(
             self,
             "OdinSMRLogConfig",
-            string_parameter_name=LOG_CONFIG_PARAMETER
+            string_parameter_name=LOG_CONFIG_SSM
         )
 
         activate_level2_task = self.set_up_activate_level2()
@@ -928,7 +924,6 @@ class OdincalStack(Stack):
             era5_bucket,
             zpt_bucket,
             ssm_logconfig,
-            lambda_timeout,
         )
 
         cache_tables_task = self.set_up_cache_tables(
@@ -937,7 +932,6 @@ class OdincalStack(Stack):
             vpc_subnets,
             psql_bucket,
             ssm_logconfig,
-            lambda_timeout,
         )
 
         calibrate_level1_task = self.set_up_calibration(
@@ -946,7 +940,6 @@ class OdincalStack(Stack):
             vpc_subnets,
             psql_bucket,
             ssm_logconfig,
-            lambda_timeout,
         )
 
         sfn.StateMachine(
