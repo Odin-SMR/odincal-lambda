@@ -21,7 +21,7 @@ SOLAR_BUCKET_NAME = "odin-solar"
 ERA5_BUCKET_NAME = "odin-era5"
 ZPT_BUCKET_NAME = "odin-zpt"
 LOG_CONFIG_SSM = "/odincal/logconf"
-PG_ROOT_SSM = "/odin/psql",
+PG_ROOT_SSM = "/odin/psql"
 LAMBDA_TIMEOUT = Duration.seconds(900)
 
 

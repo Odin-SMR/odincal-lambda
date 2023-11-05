@@ -1,6 +1,8 @@
 from pg import IntegrityError, ProgrammingError, DB
 from odincal.database import ConfiguredDatabase
+import logging
 
+logger = logging.getLogger("skh_level1_importer")
 
 def Lookup(table, stw0):
     i = 0
@@ -21,7 +23,7 @@ def shk_level1_importer(stwa, stwb, backend, pg_string=None):
                        and ac_level0.stw>={0} and ac_level0.stw<={1}
                        and backend='{2}' '''.format(*temp))
     sigresult = query.dictresult()
-    print len(sigresult)
+    logger.debug("Got %i SHK-rows for STW [%i,%i]", len(sigresult), stwa, stwb)
     for sig in sigresult:
         # For the split modes and the currently accepted
         # frontend configurations, AC1 will hold REC_495 data in its lower half

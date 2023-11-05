@@ -1,9 +1,9 @@
 attrs
-numpy==1.15.4
+numpy
 psycopg2-binary
 PyGreSQL
 pyinotify
 SQLAlchemy
 boto3
-pandas==0.24.2
-pyyaml==5.4.1
+pandas
+pyyaml

@@ -9,7 +9,9 @@ from StringIO import StringIO
 from odincal.config import config
 from datetime import datetime
 from pg import DB
+import logging
 
+logger = logging.getLogger("odincal.ac_level1a_importer")
 
 class Level1a:
     """A class to process level 0 files into level 1a."""
@@ -58,12 +60,14 @@ class Level1a:
             return 0, 0
         # perform an fft of data
         librarypath = resource_filename('oops', 'libfft.so')
+        logger.debug("loading fft.so {%s}", librarypath)
         libc = ctypes.CDLL(librarypath, mode=3)
         n0 = ctypes.c_int(112 * self.maxchips)
         c_float_p = ctypes.POINTER(ctypes.c_double)
         data0 = numpy.array(data[1])
         data_p = data0.ctypes.data_as(c_float_p)
         libc.odinfft(data_p, n0)
+        logger.debug("executed libfft.so successfully")
         # Reintroduce power into filter shapes.
         data0 = data0 * power
         return 1, data0
@@ -169,7 +173,10 @@ def ac_level1a_importer(stwa, stwb, backend, pg_string=None):
     result = query.dictresult()
     ac = Level1a()
     fgr = StringIO()
-    print len(result)
+    logger.debug(
+        "Found %i %s spectrum in the STW range  [%i,%i] ",
+        len(result), backend, stwa, stwb
+    )
     for ind, rowb in enumerate(result):
         acd_mon = numpy.ndarray(shape=(8, 2), dtype='float64',
                                 buffer=rowb['acd_mon'])
@@ -207,7 +214,7 @@ def ac_level1a_importer(stwa, stwb, backend, pg_string=None):
             "delete from ac_level1a ac using foo f where f.stw=ac.stw and ac.backend=f.backend")  # noqa
         cur.execute("insert into ac_level1a (select * from foo)")
     except (IntegrityError, InternalError) as e:
-        print e
+        logger.info("Got errors inserting into ac_level1a: %s", e)
         try:
             conn.rollback()
             cur.execute("create temporary table foo ( like ac_level1a );")
@@ -216,7 +223,7 @@ def ac_level1a_importer(stwa, stwb, backend, pg_string=None):
                 "delete from ac_level1a ac using foo f where f.stw=ac.stw and ac.backend=f.backend")  # noqa
             cur.execute("insert into ac_level1a (select * from foo)")
         except (IntegrityError, InternalError) as e1:
-            print e1
+            logger.warning("Error retrying inserting ac_level1a data: %s", e1)
             conn.rollback()
             conn.close()
             con.close()
