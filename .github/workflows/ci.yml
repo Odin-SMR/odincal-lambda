@@ -37,7 +37,7 @@ jobs:
 
         - name: build Library
           run: |
-            cd Library
+            cd odincal/oops/Library
             CFLAGS=-fPIC ./configure
             make
 
