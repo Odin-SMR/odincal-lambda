@@ -35,25 +35,20 @@ jobs:
             python2.7 -m pip install --upgrade pip
             pip install tox
 
-        - name: Run unit tests
+        - name: build Library
           run: |
-            cd odincal/odincal
-            tox
+            cd Library
+            CFLAGS=-fPIC ./configure
+            make
 
-    oops:
-        runs-on: ubuntu-20.04
-        steps:
-        - uses: actions/checkout@v2
-
-        - name: Install General Dependencies
-          run: |
-            sudo apt install python2.7-dev
-            wget -c https://bootstrap.pypa.io/pip/2.7/get-pip.py
-            python2.7 get-pip.py
-            python2.7 -m pip install --upgrade pip
-            pip install tox
-
-        - name: Run unit tests
+        - name: Run unit tests oops
           run: |
             cd odincal/oops
             tox
+
+        - name: Run unit tests odincal
+          run: |
+            cd odincal/odincal
+            tox
+  
+  

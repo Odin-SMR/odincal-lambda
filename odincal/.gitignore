@@ -14,6 +14,7 @@ develop-eggs/
 *.toc
 *.so
 *.o
+*.a
 include/
 local/
 lib/
@@ -26,3 +27,6 @@ lib/
 **/*.xml
 data/level0
 .vscode/
+config.cache
+config.status
+oops/Library/Makefile
