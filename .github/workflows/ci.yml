@@ -50,5 +50,3 @@ jobs:
           run: |
             cd odincal/odincal
             tox
-  
-  
