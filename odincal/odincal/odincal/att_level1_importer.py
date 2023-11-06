@@ -35,10 +35,12 @@ def att_level1_importer(stwa, stwb, soda, backend, pg_string=None):
                        and ac_level0.backend='{3}' '''.format(*temp))
 
     sigresult = query.dictresult()
+    spectra_to_process = len(sigresult)
     logger.info(
         "Got %i spectrum matching soda: %i and stw: [%i,%i]",
-        len(sigresult), soda, stwa, stwb
+        spectra_to_process, soda, stwa, stwb
     )
+    success_counter = 0
     fgr = StringIO()
     for sig in sigresult:
         keys = [sig['stw'], soda]
@@ -47,6 +49,7 @@ def att_level1_importer(stwa, stwb, soda, backend, pg_string=None):
                            from attitude_level0 where
                            stw>{0}-200 and stw<{0}+200
                            and soda={1}
+                           and qt!='{{0,0,0,0}}' and qa!='{{0,0,0,0}}'
                            order by stw'''.format(*keys))
         result = query.dictresult()
         logger.debug("Got %i att data rows matching %i", len(result), sig['stw'])
@@ -90,7 +93,7 @@ def att_level1_importer(stwa, stwb, soda, backend, pg_string=None):
                  tuple(att[2:6]), tuple(att[6:10]),
                  tuple(att[10:13]), tuple(att[13:19]), att[19])
             # now process data using Ohlbergs code (s.Attitude(t))
-            logging.debug('Using s.Attitude(%s)', t)
+            logger.debug('Using s.Attitude(%s)', t)
             s = odin.Spectrum()
             s.stw = long(stw)
             s.Attitude(t)
@@ -119,6 +122,12 @@ def att_level1_importer(stwa, stwb, soda, backend, pg_string=None):
                       str(s.vlsr) + '\t' +
                       str(s.level) + '\t' +
                       str(datetime.now()) + '\n')
+            success_counter = success_counter +1
+    logger.info(
+        "Successfully created %i of %i attitude entries",
+        success_counter,
+        spectra_to_process
+    )
     if pg_string is None:
         conn = psycopg2.connect(config.get('database', 'pgstring'))
     else:
