@@ -8,4 +8,6 @@ data
 **/tests
 **/docs
 **/*.pyc
-
+**/build
+**/dist
+**/*.egg-info

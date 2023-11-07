@@ -1,9 +1,10 @@
 black
+boto3-stubs[lambda,stepfunctions,s3]
+mockito
 mypy
 pip-tools
 pytest
 tox
-boto3-stubs[lambda,stepfunctions,s3]
 types-psycopg2
 types-pyyaml
 types-requests

@@ -37,11 +37,4 @@ setup(
     author='Joakim Möller',
     author_email='joakim.moller@molflow.com',
     url='http://www.molflow.com/odincal',
-    install_requires=[
-        'numpy',
-        'PyGreSQL',
-        'setuptools',
-        'mockito',
-    ],
-    # tests_require=['setuptools'],
 )

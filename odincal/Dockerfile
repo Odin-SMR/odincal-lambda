@@ -1,3 +1,15 @@
+FROM python:2.7 as build
+RUN pip install "numpy~=1.15.0"
+COPY ./oops /oops
+WORKDIR /oops/Library
+RUN CFLAGS=-fPIC ./configure
+RUN make
+WORKDIR /oops/oops
+RUN gcc -shared -o libfft.so -fPIC ../Library/odinfft.c
+WORKDIR /oops
+RUN python setup.py bdist_wheel
+
+
 FROM public.ecr.aws/lambda/python:2.7
 
 # Install requirements
@@ -17,12 +29,10 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
 # Install oops and odincal
-COPY ./oops /oops
-WORKDIR /oops/oops
-RUN gcc -shared -o libfft.so -fPIC ../Library/odinfft.c
+COPY --from=build /oops/dist/oops-1.1.1-cp27-cp27mu-linux_x86_64.whl /
 WORKDIR ${LAMBDA_TASK_ROOT}
 COPY ./odincal /odincal
-RUN PYTHONPATH="${LAMBDA_TASK_ROOT}" pip install /oops --target "${LAMBDA_TASK_ROOT}"
+RUN pip install file:///oops-1.1.1-cp27-cp27mu-linux_x86_64.whl --target "${LAMBDA_TASK_ROOT}"
 RUN PYTHONPATH="${LAMBDA_TASK_ROOT}" pip install /odincal --target "${LAMBDA_TASK_ROOT}"
 
 # Setup handler
