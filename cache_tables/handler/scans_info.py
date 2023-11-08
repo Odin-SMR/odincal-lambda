@@ -18,12 +18,11 @@ SLEEP_TIME = 60  # seconds
 
 def add_to_database(
     cursor,
-    day: dt.date,
+    datetime_i: dt.datetime,
     freqmode: int,
     backend: str,
     altend: float,
     altstart: float,
-    datetime_i: dt.datetime,
     latend: float,
     latstart: float,
     lonend: float,
@@ -52,7 +51,7 @@ def add_to_database(
         "created=EXCLUDED.created, "
         "quality=EXCLUDED.quality ",
         (
-            day,
+            datetime_i.date(),
             freqmode,
             backend,
             scanid,
@@ -67,7 +66,7 @@ def add_to_database(
             numspec,
             sunzd,
             datetime_i,
-            dt.datetime.now(),
+            dt.datetime.utcnow(),
             quality,
         ),
     )
@@ -113,15 +112,14 @@ def update_scans(
 
         db_connection = odin_connection(pg_credentials)
         db_cursor = db_connection.cursor()
-
+        scan_datetime = dt.datetime.fromisoformat(scan_log["DateTime"])
         add_to_database(
             db_cursor,
-            dt.date.fromisoformat(scan_log["DateTime"]),
+            scan_datetime,
             date_info["FreqMode"],
             date_info["Backend"],
             scan_log["AltEnd"],
             scan_log["AltStart"],
-            scan_log["DateTime"],
             scan_log["LatEnd"],
             scan_log["LatStart"],
             scan_log["LonEnd"],
