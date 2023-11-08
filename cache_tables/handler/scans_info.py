@@ -109,6 +109,7 @@ def update_scans(
         ))
         if scan_log is None:
             continue
+        scan_log = scan_log["Data"]
 
         db_connection = odin_connection(pg_credentials)
         db_cursor = db_connection.cursor()
