@@ -30,7 +30,7 @@ def assert_era5_exists(
                 month=date.month,
                 date=date.isoformat(),
             ),
-        )
+        ).load()
     except ClientError as err:
         raise NoERA5DataError(f"No ERA5 data found for {date} ({err})")
 
