@@ -29,7 +29,7 @@ def assert_era5_exists(
                 year=date.year,
                 month=date.month,
                 date=date.isoformat(),
-            ),
+            ) + "/.zattrs",
         ).load()
     except ClientError as err:
         raise NoERA5DataError(f"No ERA5 data found for {date} ({err})")
