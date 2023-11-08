@@ -18,12 +18,11 @@ SLEEP_TIME = 60  # seconds
 
 def add_to_database(
     cursor,
-    day: dt.date,
+    datetime_i: dt.datetime,
     freqmode: int,
     backend: str,
     altend: float,
     altstart: float,
-    datetime_i: dt.datetime,
     latend: float,
     latstart: float,
     lonend: float,
@@ -52,7 +51,7 @@ def add_to_database(
         "created=EXCLUDED.created, "
         "quality=EXCLUDED.quality ",
         (
-            day,
+            datetime_i.date(),
             freqmode,
             backend,
             scanid,
@@ -67,7 +66,7 @@ def add_to_database(
             numspec,
             sunzd,
             datetime_i,
-            dt.datetime.now(),
+            dt.datetime.utcnow(),
             quality,
         ),
     )
@@ -83,7 +82,7 @@ def get_odin_data(
 ) -> dict:
     url = f"{api_base}/{endpoint}"
     try:
-        response = requests.get(url, timeout=365)
+        response = requests.get(url)
         response.raise_for_status()
     except (HTTPError, RequestException) as msg:
         raise RetriesExhaustedError(f"Retries exhausted for {url} ({msg})")
@@ -97,43 +96,47 @@ def update_scans(
     """Populate database with 'cached' scans for each day."""
 
     all_scans = []
-    freqmode = date_info["FreqMode"]
+    freqmode = int(date_info["FreqMode"])
     if freqmode == 0:
         return []
-    date_str = date_info["DateString"]
+    scan_url = "rest_api/v5/level1/{freqmode}/{scan_id}/Log"
 
-    scans_api = f"rest_api/v5/freqmode_raw/{date_str}/{freqmode}/"
-    scan_data = get_odin_data(scans_api)
+    for scan_id in date_info["Scans"]:
+        scan_log = get_odin_data(scan_url.format(
+            freqmode=freqmode,
+            scan_id=scan_id,
+        ))
+        if scan_log is None:
+            continue
+        scan_log = scan_log["Data"]
 
-    db_connection = odin_connection(pg_credentials)
-    db_cursor = db_connection.cursor()
+        db_connection = odin_connection(pg_credentials)
+        db_cursor = db_connection.cursor()
+        scan_datetime = dt.datetime.fromisoformat(scan_log["DateTime"])
+        add_to_database(
+            db_cursor,
+            scan_datetime,
+            date_info["FreqMode"],
+            date_info["Backend"],
+            scan_log["AltEnd"],
+            scan_log["AltStart"],
+            scan_log["LatEnd"],
+            scan_log["LatStart"],
+            scan_log["LonEnd"],
+            scan_log["LonStart"],
+            scan_log["MJDEnd"],
+            scan_log["MJDStart"],
+            scan_log["NumSpec"],
+            scan_log["ScanID"],
+            scan_log["SunZD"],
+            scan_log["Quality"],
+        )
 
-    for scan in scan_data["Data"]:
-        if scan["ScanID"] in date_info["Scans"]:
-            add_to_database(
-                db_cursor,
-                dt.date.fromisoformat(date_str),
-                date_info["FreqMode"],
-                date_info["Backend"],
-                scan["AltEnd"],
-                scan["AltStart"],
-                scan["DateTime"],
-                scan["LatEnd"],
-                scan["LatStart"],
-                scan["LonEnd"],
-                scan["LonStart"],
-                scan["MJDEnd"],
-                scan["MJDStart"],
-                scan["NumSpec"],
-                scan["ScanID"],
-                scan["SunZD"],
-                scan["Quality"],
-            )
-            all_scans.append(scan)
+        db_connection.commit()
+        db_cursor.close()
+        db_connection.close()
 
-    db_connection.commit()
-    db_cursor.close()
-    db_connection.close()
+        all_scans.append(scan_log)
 
     return all_scans
 
