@@ -121,6 +121,35 @@ class OdincalStack(Stack):
         psql_bucket.grant_read(get_job_info_level1_lambda)
         psql_bucket.grant_read(calibrate_level1_lambda)
 
+        # Set up fail states
+        preprocess_level1_fail_state = sfn.Fail(
+            self,
+            "OdinSMRPreprocessLevel1Fail",
+            comment="Somthing went wrong when preprocessing Level 0 file",
+            cause_path="$.PreprocessLevel1",
+            cause="$"
+        )
+        check_preprocess_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckPreprocessLevel1Status",
+        )
+
+        job_info_level1_fail_state = sfn.Fail(
+            self,
+            "OdinSMRGetJobInfoLevel1Fail",
+            comment="Somthing went wrong when getting job for Level 0 file",
+        )
+        check_job_info_status_state = sfn.Choice(
+            self,
+            "OdinSMRCheckGetJobInfoLevel1Status",
+        )
+
+        calibrate_level1_fail_state = sfn.Fail(
+            self,
+            "OdinSMRCalibrateLevel1Fail",
+            comment="Somthing went wrong when importing Level 0 file",
+        )
+
         # Set up tasks
         preprocess_level1_task = tasks.LambdaInvoke(
             self,
@@ -134,8 +163,13 @@ class OdincalStack(Stack):
             ),
             result_path="$.PreprocessLevel1",
         )
+        preprocess_level1_task.add_catch(
+            preprocess_level1_fail_state,
+            errors=["States.ALL"],
+            result_path="$.PreprocessLevel1",
+        )
         preprocess_level1_task.add_retry(
-            errors=["MissingAttitude", "NoLevel0Data"],
+            errors=["MissingAttitude"],
             max_attempts=4,
             backoff_rate=2,
             interval=Duration.days(3),
@@ -222,31 +256,7 @@ class OdincalStack(Stack):
         )
 
         # Set up workflow
-        preprocess_level1_fail_state = sfn.Fail(
-            self,
-            "OdinSMRPreprocessLevel1Fail",
-            comment="Somthing went wrong when preprocessing Level 0 file",
-        )
-        check_preprocess_status_state = sfn.Choice(
-            self,
-            "OdinSMRCheckPreprocessLevel1Status",
-        )
 
-        job_info_level1_fail_state = sfn.Fail(
-            self,
-            "OdinSMRGetJobInfoLevel1Fail",
-            comment="Somthing went wrong when getting job for Level 0 file",
-        )
-        check_job_info_status_state = sfn.Choice(
-            self,
-            "OdinSMRCheckGetJobInfoLevel1Status",
-        )
-
-        calibrate_level1_fail_state = sfn.Fail(
-            self,
-            "OdinSMRCalibrateLevel1Fail",
-            comment="Somthing went wrong when importing Level 0 file",
-        )
         check_calibrate_status_state = sfn.Choice(
             self,
             "OdinSMRCheckCalibrateLevel1Status",
