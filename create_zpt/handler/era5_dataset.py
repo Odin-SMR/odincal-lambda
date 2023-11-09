@@ -20,7 +20,7 @@ def get_dataset(range: list[dt.date]):
                 key=ERA5_PATTERN.format(
                     year=d.year,
                     month=d.month,
-                    date=d.isoformat()
+                    date=d.isoformat(),
                 )
             ),
             check=False,
