@@ -99,7 +99,7 @@ def update_scans(
     freqmode = int(date_info["FreqMode"])
     if freqmode == 0:
         return []
-    scan_url = "rest_api/v5/level1/{freqmode}/{scan_id}/Log"
+    scan_url = "rest_api/v5/level1/{freqmode}/{scan_id}/Log/"
 
     for scan_id in date_info["Scans"]:
         scan_log = get_odin_data(scan_url.format(
