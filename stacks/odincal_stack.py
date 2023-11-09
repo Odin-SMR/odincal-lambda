@@ -135,7 +135,7 @@ class OdincalStack(Stack):
             result_path="$.PreprocessLevel1",
         )
         preprocess_level1_task.add_retry(
-            errors=["MissingAttitude"],
+            errors=["MissingAttitude", "NoLevel0Data"],
             max_attempts=4,
             backoff_rate=2,
             interval=Duration.days(3),

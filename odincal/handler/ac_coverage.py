@@ -3,6 +3,10 @@ from odindb import squeeze_query
 from pg import DB
 
 
+class NoLevel0Data(Exception):
+    pass
+
+
 class MissingAttitude(Exception):
     pass
 
@@ -80,18 +84,21 @@ def assert_acfile_has_data_coverage(
     bin_minutes = 15
     query = con.query(bin_query, (buffer_hours, bin_minutes, backend, ac_file))
     result = query.dictresult()
+    if len(result) == 0:
+        msg = "No data available for file {2} in the period {0:x}({0}) to {1:x}({1})".format(
+            int(start), int(end), ac_file
+        )
+        raise NoLevel0Data(msg)
     df = pd.DataFrame.from_dict(result)
     con.close()
     start = df.stw_bin.min()
     end = df.stw_bin.max()
     if df.iloc[0].ac_file_cnt < 3:
-        msg = (
-            "File {2} has missing AC-file neighbours in the period {0:x}({0}) to {1:x}({1})".format(
-                int(start), int(end),ac_file
-            )
+        msg = "File {2} has missing AC-file neighbours in the period {0:x}({0}) to {1:x}({1})".format(
+            int(start), int(end), ac_file
         )
         raise MissingACNeighbours(msg)
-    
+
     if not df[df.att_cnt == 0].empty or not df[df.att_cnt.isnull()].empty:
         msg = "File {2} has missing attitude data in the period {0:x}({0}) to {1:x}({1})".format(
             int(start), int(end), ac_file
