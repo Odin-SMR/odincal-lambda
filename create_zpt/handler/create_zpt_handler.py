@@ -28,7 +28,7 @@ def get_scan_data(scans_info: list[dict[str, Any]]) -> DataArray:
     for d in scans_info:
         data.extend(d["ScansInfo"])
 
-    df = DataFrame.from_records(data)
+    df = DataFrame.from_records(data).drop_duplicates()
     df["MJDMid"] = (df["MJDStart"] + df["MJDEnd"]) * 0.5
     df["LatMid"], df["LonMid"] = get_scan_geo_loc(
         df["LatStart"],
