@@ -54,7 +54,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=2048,
+            memory_size=5350,
             environment=environment,
             function_name="OdincalPreprocess",
         )
@@ -77,7 +77,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=2048,
+            memory_size=266,
             environment=environment,
             function_name="OdincalGetJobInfo",
         )
@@ -100,7 +100,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=2048,
+            memory_size=5350,
             environment=environment,
             function_name="OdincalImportL1B",
         )
@@ -134,17 +134,30 @@ class OdincalStack(Stack):
             ),
             result_path="$.PreprocessLevel1",
         )
+        preprocess_level1_task.add_catch(
+            self.calibration_stopped,
+            errors=["MissingAttitude", "MissingSHK"],
+            result_path="$.Status",
+        )
         preprocess_level1_task.add_retry(
             errors=["MissingAttitude"],
-            max_attempts=4,
+            max_attempts=5,
             backoff_rate=2,
             interval=Duration.days(3),
             max_delay=Duration.days(7),
             jitter_strategy=sfn.JitterType.NONE,
         )
         preprocess_level1_task.add_retry(
-            errors=["MissingSHK", "MissingACNeighbours"],
-            max_attempts=4,
+            errors=["MissingACNeighbours"],
+            max_attempts=5,
+            backoff_rate=2,
+            interval=Duration.days(1),
+            max_delay=Duration.days(4),
+            jitter_strategy=sfn.JitterType.NONE,
+        )
+        preprocess_level1_task.add_retry(
+            errors=["MissingSHK"],
+            max_attempts=5,
             backoff_rate=2,
             interval=Duration.days(1),
             max_delay=Duration.days(4),
@@ -177,13 +190,20 @@ class OdincalStack(Stack):
             ),
             result_path="$.JobInfo",
         )
+        preprocess_level1_task.add_catch(
+            job_info_level1_task,
+            errors=["MissingACNeighbours"],
+            result_path="$.Status"
+        )
+        job_info_level1_task.add_catch(
+            self.calibration_stopped,
+            errors=["Level1BPrepareDataError"],
+            result_path="$.Status",
+        )
         job_info_level1_task.add_retry(
             errors=["Level1BPrepareDataError"],
-            max_attempts=42,
-            backoff_rate=2,
-            interval=Duration.minutes(12),
-            max_delay=Duration.minutes(42),
-            jitter_strategy=sfn.JitterType.FULL,
+            max_attempts=0,
+
         )
         job_info_level1_task.add_retry(
             errors=["States.ALL"],
@@ -313,7 +333,7 @@ class OdincalStack(Stack):
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
-            memory_size=1024,
+            memory_size=256,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             function_name="OdincalDateInfo",
@@ -334,7 +354,7 @@ class OdincalStack(Stack):
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             runtime=Runtime.PYTHON_3_10,
-            memory_size=1024,
+            memory_size=256,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             function_name="OdincalScansInfo",
@@ -504,6 +524,7 @@ class OdincalStack(Stack):
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             function_name="OdinZPTGetScanIDs",
+            memory_size=512,
         )
 
         check_zpt_lambda = DockerImageFunction(
@@ -518,6 +539,7 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             function_name="OdinZPTCheckZPT",
+            memory_size=512,
         )
 
         check_era5_lambda = DockerImageFunction(
@@ -532,6 +554,7 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             function_name="OdinZPTCheckERA5",
+            memory_size=512,
         )
 
         check_solar_lambda = DockerImageFunction(
@@ -546,6 +569,7 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             function_name="OdinZPTCheckSolar",
+            memory_size=512,
         )
 
         create_zpt_lambda = DockerImageFunction(
@@ -914,7 +938,13 @@ class OdincalStack(Stack):
             "OdinSMROdincalZPTBucket",
             ZPT_BUCKET_NAME,
         )
-
+        self.calibration_stopped = sfn.Succeed(
+            self,
+            "ODINSMRCalibrationStopped",
+            comment="Calibration finished, nothing more to do.",
+            state_name="Calibration Stop",
+            input_path="$.Status",
+        )
         # Set up state machine
         create_zpt_task = self.set_up_create_zpt(
             activate_level2_task,
