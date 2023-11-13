@@ -136,7 +136,7 @@ class OdincalStack(Stack):
         )
         preprocess_level1_task.add_catch(
             self.calibration_stopped,
-            errors=["MissingAttitude","MissingSHK"],
+            errors=["MissingAttitude", "MissingSHK"],
             result_path="$.Status",
         )
         preprocess_level1_task.add_retry(
