@@ -18,7 +18,6 @@ from .geos import gmh
 from .scan_data_descriptions import parameter_desc
 from .log_configuration import logconfig
 
-logconfig()
 
 AWS_REGION = "eu-north-1"
 
@@ -58,6 +57,7 @@ def get_scan_data(scans_info: list[dict[str, Any]]) -> DataArray:
 
 
 def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    logconfig()
     scans = get_scan_data(event["ScansInfo"])
 
     dates: list[dt.date] = list(set(

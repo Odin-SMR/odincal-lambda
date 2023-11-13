@@ -7,7 +7,6 @@ import boto3
 from botocore.exceptions import ClientError
 from .log_configuration import logconfig
 
-logconfig()
 
 ZPT_BUCKET = "odin-zpt"
 ZPT_PATTERN = "{backend}/{prefix}/{filename}.parquet"
@@ -38,6 +37,7 @@ def assert_zpt_exists(
 
 
 def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    logconfig()
     filename = os.path.split(event["name"])[-1]
     prefix = filename[0:3]
     backend = event["type"]
