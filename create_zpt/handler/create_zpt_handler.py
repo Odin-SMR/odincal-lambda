@@ -18,7 +18,6 @@ from .geos import gmh
 from .scan_data_descriptions import parameter_desc
 from .log_configuration import logconfig
 
-logconfig()
 
 AWS_REGION = "eu-north-1"
 
@@ -28,7 +27,7 @@ def get_scan_data(scans_info: list[dict[str, Any]]) -> DataArray:
     for d in scans_info:
         data.extend(d["ScansInfo"])
 
-    df = DataFrame.from_records(data)
+    df = DataFrame.from_records(data).drop_duplicates()
     df["MJDMid"] = (df["MJDStart"] + df["MJDEnd"]) * 0.5
     df["LatMid"], df["LonMid"] = get_scan_geo_loc(
         df["LatStart"],
@@ -58,6 +57,7 @@ def get_scan_data(scans_info: list[dict[str, Any]]) -> DataArray:
 
 
 def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    logconfig()
     scans = get_scan_data(event["ScansInfo"])
 
     dates: list[dt.date] = list(set(
