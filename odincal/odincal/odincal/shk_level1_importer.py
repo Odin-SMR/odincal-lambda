@@ -11,10 +11,10 @@ def find_nearest(df, stw):
     try:
         data = df.iloc[index]
     except IndexError:
-        return 0
+        return None
     real_stw = data.name
     if (real_stw > stw + 2080) or (real_stw < stw - 2080):
-        return 0
+        return None
     return data.shk_value
 
 
@@ -61,18 +61,18 @@ def shk_level1_importer(stwa, stwb, backend, pg_string):
                 "stw": sig["stw"],
                 "backend": sig["backend"],
                 "frontendsplit": frontend,
-                "imageloada": data["imageloadA"],
-                "imageloadb": data["imageloadB"],
-                "hotloada": data["hotloadA"],
-                "hotloadb": data["hotloadB"],
-                "mixera": data["mixerA"],
-                "mixerb": data["mixerB"],
-                "lnaa": data["lnaA"],
-                "lnab": data["lnaB"],
-                "mixer119a": data["119mixerA"],
-                "mixer119b": data["119mixerB"],
-                "warmifa": data["warmifA"],
-                "warmifb": data["warmifB"],
+                "imageloada": data.get("imageloadA", None),
+                "imageloadb": data.get("imageloadB", None),
+                "hotloada": data.get("hotloadA", None),
+                "hotloadb": data.get("hotloadB", None),
+                "mixera": data.get("mixerA", None),
+                "mixerb": data.get("mixerB", None),
+                "lnaa": data.get("lnaA", None),
+                "lnab": data.get("lnaB", None),
+                "mixer119a": data.get("119mixerA", None),
+                "mixer119b": data.get("119mixerB", None),
+                "warmifa": data.get("warmifA", None),
+                "warmifb": data.get("warmifB", None),
                 "created": datetime.now(),
             }
             if frontend != "119":
@@ -88,3 +88,9 @@ def shk_level1_importer(stwa, stwb, backend, pg_string):
     logger.debug("finished SHK level1 importer")
 
     con.close()
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    psql_connection_string = "postgresql://odin@127.0.0.1/odin?sslmode=verify-ca"
+    shk_level1_importer(14166160221,14166833456, "AC2", psql_connection_string)
