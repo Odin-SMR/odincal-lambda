@@ -1,124 +1,90 @@
-from pg import IntegrityError, ProgrammingError, DB
-from odincal.database import ConfiguredDatabase
+from datetime import datetime
+from pg import DB
+from pandas import DataFrame
 import logging
 
-logger = logging.getLogger("skh_level1_importer")
-
-def Lookup(table, stw0):
-    i = 0
-    while i < len(table[0]) - 1 and table[0][i + 1] < stw0:
-        i = i + 1
-    return table[1][i]
+logger = logging.getLogger("odincal.skh_level1_importer")
 
 
-def shk_level1_importer(stwa, stwb, backend, pg_string=None):
-    if pg_string is None:
-        con = ConfiguredDatabase()
-    else:
-        con = DB(pg_string)
-    temp = [stwa, stwb, backend]
-    query = con.query('''select stw,backend,frontend from ac_level0
-                       left join shk_level1 using (stw,backend)
-                       where imageloadb is NULL
-                       and ac_level0.stw>={0} and ac_level0.stw<={1}
-                       and backend='{2}' '''.format(*temp))
+def find_nearest(df, stw):
+    index = df.index.searchsorted(stw)
+    try:
+        data = df.iloc[index]
+    except IndexError:
+        return 0
+    real_stw = data.name
+    if (real_stw > stw + 2080) or (real_stw < stw - 2080):
+        return 0
+    return data.shk_value
+
+
+def shk_level1_importer(stwa, stwb, backend, pg_string):
+    con = DB(pg_string)
+    query = con.query(
+        """\
+        select stw,backend,frontend from ac_level0
+        where ac_level0.stw>=$1 and ac_level0.stw<=$2
+        and backend=$3""",
+        (stwa, stwb, backend),
+    )
+
     sigresult = query.dictresult()
-    logger.debug("Got %i SHK-rows for STW [%i,%i]", len(sigresult), stwa, stwb)
+    logger.debug("Got %i spectrum to import [%i,%i]", len(sigresult), stwa, stwb)
+    query = con.query(
+        """\
+        select stw,shk_type,shk_value from shk_level0
+        where stw between $1 and $2
+        order by stw""",
+        (stwa - 2080, stwb + 2080),
+    )
+    shk_rows = query.dictresult()
+    logger.debug("Got %i SHK-rows for STW [%i,%i]", len(shk_rows), stwa, stwb)
+    df = DataFrame.from_dict(shk_rows).set_index("stw")
+    gr = df.groupby("shk_type")
+    table_data = []
+    logger.debug("starting matching process")
     for sig in sigresult:
+        data = gr.apply(find_nearest, sig["stw"])
         # For the split modes and the currently accepted
         # frontend configurations, AC1 will hold REC_495 data in its lower half
         # and REC_549 in its upper half. AC2 will hold REC_572 data in its
         # lower half and REC_555 in its upper half.
-        if sig['frontend'] == 'SPL':
-            if sig['backend'] == 'AC1':
-                frontends = ['495', '549']
-            if sig['backend'] == 'AC2':
-                frontends = ['572', '555']
+        if sig["frontend"] == "SPL":
+            if sig["backend"] == "AC1":
+                frontends = ["495", "549"]
+            if sig["backend"] == "AC2":
+                frontends = ["572", "555"]
         else:
-            frontends = [sig['frontend']]
-        for ind, frontend in enumerate(frontends):
+            frontends = [sig["frontend"]]
+        for frontend in frontends:
             shkdict = {
-                'stw': sig['stw'],
-                'backend': sig['backend'],
-                'frontendsplit': frontend,
-                'lo': [],
-                'ssb': [],
-                'mixc': [],
-                'imageloada': [],
-                'imageloadb': [],
-                'hotloada': [],
-                'hotloadb': [],
-                'mixera': [],
-                'mixerb': [],
-                'lnaa': [],
-                'lnab': [],
-                'mixer119a': [],
-                'mixer119b': [],
-                'warmifa': [],
-                'warmifb': [],
+                "stw": sig["stw"],
+                "backend": sig["backend"],
+                "frontendsplit": frontend,
+                "imageloada": data["imageloadA"],
+                "imageloadb": data["imageloadB"],
+                "hotloada": data["hotloadA"],
+                "hotloadb": data["hotloadB"],
+                "mixera": data["mixerA"],
+                "mixerb": data["mixerB"],
+                "lnaa": data["lnaA"],
+                "lnab": data["lnaB"],
+                "mixer119a": data["119mixerA"],
+                "mixer119b": data["119mixerB"],
+                "warmifa": data["warmifA"],
+                "warmifb": data["warmifB"],
+                "created": datetime.now(),
             }
-            shklist = [
-                'LO',
-                'SSB',
-                'mixC',
-                'imageloadB',
-                'imageloadA',
-                'imageloadB',
-                'hotloadA',
-                'hotloadB',
-                'mixerA',
-                'mixerB',
-                'lnaA',
-                'lnaB',
-                '119mixerA',
-                '119mixerB',
-                'warmifA',
-                'warmifB']
-            if frontend == '119':
-                shklist = ['imageloadA', 'imageloadB', 'hotloadA', 'hotloadB',
-                           'mixerA', 'mixerB', 'lnaA', 'lnaB',
-                           '119mixerA', '119mixerB', 'warmifA', 'warmifB']
-            insert = 1
+            if frontend != "119":
+                shkdict["lo"] = data["LO" + frontend]
+                shkdict["ssb"] = data["SSB" + frontend]
+                shkdict["mixc"] = data["mixC" + frontend]
+            table_data.append(shkdict)
+    logger.debug("upserting %s rows", len(table_data))
+    con.start()
+    for data in table_data:
+        con.upsert("shk_level1", data)
+    con.end()
+    logger.debug("finished SHK level1 importer")
 
-            for shk in shklist:
-                if shk == 'LO' or shk == 'SSB' or shk == 'mixC':
-                    sel = [shk + frontend, sig['stw']]
-                else:
-                    sel = [shk, sig['stw']]
-                query = con.query('''select stw,shk_value from shk_level0
-                               where shk_type='{0}' and
-                               stw>{1}-2080 and stw<{1}+2080
-                               order by stw'''.format(*sel[:]))
-                result = query.getresult()
-                if len(result) < 2 and (shk == 'mixerA' or shk == 'mixerB' or
-                                        shk == 'hotloadA' or shk == 'hotloadB' or  # noqa
-                                        shk == 'lnaA' or shk == 'lnaB' or
-                                        shk == 'imageloadA' or shk == 'imageloadB' or  # noqa
-                                        shk == '119mixerA' or shk == '119mixerB' or  # noqa
-                                        shk == 'warmifA' or shk == 'warmifB'):
-                    shkdict[shk.lower()] = 0
-                    continue
-                if len(result) < 2:
-                    insert = 0
-                    break
-                stw = []
-                data = []
-                for row in result:
-                    stw.append(row[0])
-                    data.append(row[1])
-                table = (stw, data)
-                data0 = Lookup(table, sig['stw'])
-                if shk == '119mixerA':
-                    shkdict['mixer119a'] = float(data0)
-                elif shk == '119mixerB':
-                    shkdict['mixer119b'] = float(data0)
-                else:
-                    shkdict[shk.lower()] = float(data0)
-            if insert == 1:
-                try:
-                    con.insert('shk_level1', shkdict)
-                except (ProgrammingError, IntegrityError):
-                    pass
-            # query=con.query('''select LO from shk_level1''')
-            # res=query.getresult()
     con.close()
