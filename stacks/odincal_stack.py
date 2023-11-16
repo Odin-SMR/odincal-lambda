@@ -54,7 +54,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=5350,
+            memory_size=384,
             environment=environment,
             function_name="OdincalPreprocess",
         )
@@ -100,7 +100,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=5350,
+            memory_size=1152,
             environment=environment,
             function_name="OdincalImportL1B",
         )
