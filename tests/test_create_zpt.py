@@ -1,3 +1,4 @@
+import pytest
 from create_zpt.handler.create_zpt_handler import get_scan_data
 
 # Dataset from a failed statemachine, is this a split scan?
@@ -42,7 +43,69 @@ scans = [
     },
 ]
 
+# Another error collected from logs
+scans2 = [
+    {
+        "StatusCode": 200,
+        "ScansInfo": [
+            {
+                "AltStart": 101198.2,
+                "AltEnd": 71997.71,
+                "LatStart": -80.69511,
+                "LatEnd": -74.56122,
+                "LonStart": 255.60405,
+                "LonEnd": 155.68942,
+                "MJDStart": 60223.4118582,
+                "MJDEnd": 60223.4152584,
+                "ScanID": 14243177578,
+                "FreqMode": 2,
+                "Backend": "AC1",
+            },
+            {
+                "AltStart": 101198.2,
+                "AltEnd": 71997.71,
+                "LatStart": -80.69511,
+                "LatEnd": -74.56122,
+                "LonStart": 255.60405,
+                "LonEnd": 155.68942,
+                "MJDStart": 60223.4118582,
+                "MJDEnd": 60223.4152584,
+                "ScanID": 14243177578,
+                "FreqMode": 2,
+                "Backend": "AC1",
+            },
+            {
+                "AltStart": 101198.2,
+                "AltEnd": 62083.902,
+                "LatStart": -80.69511,
+                "LatEnd": -82.37251,
+                "LonStart": 255.60405,
+                "LonEnd": 205.98912,
+                "MJDStart": 60223.4118582,
+                "MJDEnd": 60223.4130148,
+                "ScanID": 14243177578,
+                "FreqMode": 21,
+                "Backend": "AC1",
+            },
+            {
+                "AltStart": 101198.2,
+                "AltEnd": 62083.902,
+                "LatStart": -80.69511,
+                "LatEnd": -82.37251,
+                "LonStart": 255.60405,
+                "LonEnd": 205.98912,
+                "MJDStart": 60223.4118582,
+                "MJDEnd": 60223.4130148,
+                "ScanID": 14243177578,
+                "FreqMode": 21,
+                "Backend": "AC1",
+            },
+        ],
+    }
+]
 
-def test_get_scan_data():
-    data = get_scan_data(scans)
-    assert (1,) == data.ScanID.shape
+
+@pytest.mark.parametrize("test_input,expected", [(scans, (1,)), (scans2, (1,))])
+def test_get_scan_data(test_input, expected):
+    data = get_scan_data(test_input)
+    assert expected == data.ScanID.shape

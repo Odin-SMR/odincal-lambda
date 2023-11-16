@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import xarray
 from pandas import to_datetime  # type: ignore
@@ -9,6 +10,8 @@ from .msis90 import extractPTZprofilevarsolar
 # to ensure an ok stratopause Donal wants to add a 50 km point
 # from msis
 MSISZ = np.r_[49.0, 50.0, 51, np.arange(75, 151, 1)]
+
+logger = logging.getLogger("odincal.donaletty")
 
 
 class Donaletty:
@@ -57,13 +60,21 @@ class Donaletty:
         )
         return zpt
 
+    def interpolate_gmh(
+            self,  da: xarray.DataArray, ecmz: np.ndarray
+    ) -> xarray.DataArray:
+        logger.debug("interpolating scanid %s", da.ScanID.values)
+        interpolated = da.squeeze().swap_dims(level="era5_gmh").interp(
+                era5_gmh=ecmz, kwargs={"fill_value": 273}
+                )
+        return interpolated
+
     def makeprofile(self, scans: xarray.DataArray):
         ecmz = np.arange(45)
         newz = np.arange(151)
         scan_on_interp_gmh = scans.groupby("ScanID").map(
-            lambda ds: ds.squeeze().swap_dims(level="era5_gmh").interp(
-                era5_gmh=ecmz, kwargs={"fill_value": 273}
-            )
+            func=self.interpolate_gmh,
+            args=(ecmz,)
         )
         zpt_donaletty = scan_on_interp_gmh.groupby("ScanID").map(
             self.donaletty, args=(newz,)

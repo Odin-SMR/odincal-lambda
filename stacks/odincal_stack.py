@@ -54,7 +54,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=5350,
+            memory_size=384,
             environment=environment,
             function_name="OdincalPreprocess",
         )
@@ -100,7 +100,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=5350,
+            memory_size=1152,
             environment=environment,
             function_name="OdincalImportL1B",
         )
@@ -203,7 +203,6 @@ class OdincalStack(Stack):
         job_info_level1_task.add_retry(
             errors=["Level1BPrepareDataError"],
             max_attempts=0,
-
         )
         job_info_level1_task.add_retry(
             errors=["States.ALL"],
@@ -231,6 +230,15 @@ class OdincalStack(Stack):
                 },
             ),
             result_path="$.CalibrateLevel1",
+        )
+        calibrate_level1_task.add_catch(
+            self.calibration_stopped,
+            errors=["Level1BPrepareDataError"],
+            result_path="$.Status",
+        )
+        calibrate_level1_task.add_retry(
+            errors=["Level1BPrepareDataError"],
+            max_attempts=0,
         )
         calibrate_level1_task.add_retry(
             errors=["States.ALL"],
