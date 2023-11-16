@@ -93,4 +93,5 @@ def shk_level1_importer(stwa, stwb, backend, pg_string):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     psql_connection_string = "postgresql://odin@127.0.0.1/odin?sslmode=verify-ca"
-    shk_level1_importer(14166160221,14166833456, "AC2", psql_connection_string)
+    shk_level1_importer(14166160221, 14166833456, "AC2", psql_connection_string)
+
