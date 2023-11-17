@@ -100,7 +100,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=1152,
+            memory_size=1769,
             environment=environment,
             function_name="OdincalImportL1B",
         )
@@ -532,7 +532,7 @@ class OdincalStack(Stack):
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
             function_name="OdinZPTGetScanIDs",
-            memory_size=512,
+            memory_size=128,
         )
 
         check_zpt_lambda = DockerImageFunction(
@@ -547,7 +547,7 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             function_name="OdinZPTCheckZPT",
-            memory_size=512,
+            memory_size=128,
         )
 
         check_era5_lambda = DockerImageFunction(
@@ -562,7 +562,7 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             function_name="OdinZPTCheckERA5",
-            memory_size=512,
+            memory_size=320,
         )
 
         check_solar_lambda = DockerImageFunction(
@@ -577,7 +577,7 @@ class OdincalStack(Stack):
             vpc=vpc,
             vpc_subnets=vpc_subnets,
             function_name="OdinZPTCheckSolar",
-            memory_size=512,
+            memory_size=320,
         )
 
         create_zpt_lambda = DockerImageFunction(
@@ -591,7 +591,7 @@ class OdincalStack(Stack):
             architecture=Architecture.X86_64,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
-            memory_size=2048,
+            memory_size=896,
             function_name="OdinZPTCreateZPT",
         )
 
