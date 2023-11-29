@@ -54,7 +54,7 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            memory_size=384,
+            memory_size=1769,
             environment=environment,
             function_name="OdincalPreprocess",
         )
@@ -141,26 +141,26 @@ class OdincalStack(Stack):
         )
         preprocess_level1_task.add_retry(
             errors=["MissingAttitude"],
-            max_attempts=5,
-            backoff_rate=2,
-            interval=Duration.days(3),
-            max_delay=Duration.days(7),
+            max_attempts=30,
+            backoff_rate=1,
+            interval=Duration.days(1),
+            max_delay=Duration.days(1),
             jitter_strategy=sfn.JitterType.NONE,
         )
         preprocess_level1_task.add_retry(
             errors=["MissingACNeighbours"],
-            max_attempts=5,
-            backoff_rate=2,
+            max_attempts=30,
+            backoff_rate=1,
             interval=Duration.days(1),
-            max_delay=Duration.days(4),
+            max_delay=Duration.days(1),
             jitter_strategy=sfn.JitterType.NONE,
         )
         preprocess_level1_task.add_retry(
             errors=["MissingSHK"],
-            max_attempts=5,
-            backoff_rate=2,
+            max_attempts=30,
+            backoff_rate=1,
             interval=Duration.days(1),
-            max_delay=Duration.days(4),
+            max_delay=Duration.days(1),
             jitter_strategy=sfn.JitterType.NONE,
         )
         preprocess_level1_task.add_retry(
