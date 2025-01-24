@@ -16,7 +16,7 @@ class NoZPTError(Exception):
     pass
 
 
-def assert_zpt_exists(
+def assert_era5_exists(
     filename: str,
     prefix: str,
     backend: str,
@@ -44,7 +44,7 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
 
     s3_client = boto3.resource("s3")
     try:
-        assert_zpt_exists(filename, prefix, backend, s3_client)
+        assert_era5_exists(filename, prefix, backend, s3_client)
     except NoZPTError:
         return {"StatusCode": 404}
 
