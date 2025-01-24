@@ -1,11 +1,12 @@
 """Create and store ZPT file for input
 """
+
 import datetime as dt
 import os
 from typing import Any
 
 from pandas import DataFrame, Timestamp  # type: ignore
-from xarray import DataArray
+from xarray import Dataset
 import pyarrow as pa  # type: ignore
 import pyarrow.parquet as pq  # type: ignore
 
@@ -22,7 +23,7 @@ from .log_configuration import logconfig
 AWS_REGION = "eu-north-1"
 
 
-def get_scan_data(scans_info: list[dict[str, Any]]) -> DataArray:
+def get_scan_data(scans_info: list[dict[str, Any]]) -> Dataset:
     data = []
     for d in scans_info:
         data.extend(d["ScansInfo"])
@@ -35,9 +36,7 @@ def get_scan_data(scans_info: list[dict[str, Any]]) -> DataArray:
         df["LatEnd"],
         df["LonEnd"],
     )
-    df["DateMid"] = df["MJDMid"].apply(
-        lambda x: mjd2datetime(x).replace(tzinfo=None)
-    )
+    df["DateMid"] = df["MJDMid"].apply(lambda x: mjd2datetime(x).replace(tzinfo=None))
 
     scans = df.set_index("ScanID").to_xarray()
     scans.ScanID.attrs = parameter_desc["scanid"]
@@ -60,9 +59,7 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     logconfig()
     scans = get_scan_data(event["ScansInfo"])
 
-    dates: list[dt.date] = list(set(
-        Timestamp(d).date() for d in scans.DateMid.values
-    ))
+    dates: list[dt.date] = list(set(Timestamp(d).date() for d in scans.DateMid.values))
     dates.sort()
     era5_data = get_era5(dates)
     era5_data["longitude"] = era5_data.longitude - 180

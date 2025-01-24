@@ -1,5 +1,6 @@
 """ Check if ZPT file already exists for the file being processed.
 """
+
 import os
 from typing import Any
 
@@ -30,7 +31,7 @@ def assert_era5_exists(
                 backend=backend,
                 prefix=prefix,
                 filename=filename,
-            )
+            ),
         ).load()
     except ClientError as err:
         raise NoZPTError(f"No ERA5 data found for {filename} ({err})")

@@ -47,7 +47,7 @@ class Donaletty:
             / np.interp([20], scan_data.era5_gmh.data, scan_data.era5_t.data)
         )
         newT, newp, _, _, _, _, _ = intatm(
-            z, temp, newz, 20, normrho[0], scan_data.LatMid.item(),
+            z, temp, newz, 20, normrho[0], scan_data.LatMid.item()
         )
         zpt = xarray.Dataset(
             data_vars=dict(
@@ -60,21 +60,20 @@ class Donaletty:
         )
         return zpt
 
-    def interpolate_gmh(
-            self,  da: xarray.DataArray, ecmz: np.ndarray
-    ) -> xarray.DataArray:
+    def interpolate_gmh(self, da: xarray.Dataset, ecmz: np.ndarray) -> xarray.Dataset:
         logger.debug("interpolating scanid %s", da.ScanID.values)
-        interpolated = da.squeeze().swap_dims(level="era5_gmh").interp(
-                era5_gmh=ecmz, kwargs={"fill_value": 273}
-                )
+        interpolated = (
+            da.squeeze()
+            .swap_dims(level="era5_gmh")
+            .interp(era5_gmh=ecmz, kwargs={"fill_value": 273})
+        )
         return interpolated
 
-    def makeprofile(self, scans: xarray.DataArray):
+    def makeprofile(self, scans: xarray.Dataset):
         ecmz = np.arange(45)
         newz = np.arange(151)
         scan_on_interp_gmh = scans.groupby("ScanID").map(
-            func=self.interpolate_gmh,
-            args=(ecmz,)
+            func=self.interpolate_gmh, args=(ecmz,)
         )
         zpt_donaletty = scan_on_interp_gmh.groupby("ScanID").map(
             self.donaletty, args=(newz,)

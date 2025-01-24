@@ -1,5 +1,6 @@
 """Extract just the scan IDs and frequency modes from input
 """
+
 from typing import Any
 from .log_configuration import logconfig
 
