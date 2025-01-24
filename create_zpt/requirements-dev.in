@@ -1,0 +1,10 @@
+# boto is included in the lambda
+black[jupyter]
+boto3
+boto3-stubs[lambda,stepfunctions,s3]
+ipykernel
+mypy
+pandas-stubs
+pyarrow-stubs
+pytest
+types-pyyaml
