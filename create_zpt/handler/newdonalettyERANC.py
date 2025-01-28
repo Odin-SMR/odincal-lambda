@@ -40,11 +40,17 @@ class Donaletty:
         z = np.r_[scan_data.era5_gmh.data.flatten(), MSISZ]
         temp = np.r_[scan_data.era5_t.data.flatten(), msisT]
         normrho = (
-            np.interp([20], scan_data.era5_gmh.data.flatten(), scan_data.era5_level.data.flatten())
+            np.interp(
+                [20],
+                scan_data.era5_gmh.data.flatten(),
+                scan_data.era5_level.data.flatten(),
+            )
             * 28.9644
             / 1000
             / IDEALGAS
-            / np.interp([20], scan_data.era5_gmh.data.flatten(), scan_data.era5_t.data.flatten())
+            / np.interp(
+                [20], scan_data.era5_gmh.data.flatten(), scan_data.era5_t.data.flatten()
+            )
         )
         newT, newp, _, _, _, _, _ = intatm(
             z, temp, newz, 20, normrho[0], scan_data.LatMid.item()

@@ -58,13 +58,15 @@ class OdincalStack(Stack):
             environment=environment,
             function_name="OdincalPreprocess",
         )
-        preprocess_level1_lambda.add_to_role_policy(PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=["ssm:GetParameter"],
-            resources=[
-                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
-            ]
-        ))
+        preprocess_level1_lambda.add_to_role_policy(
+            PolicyStatement(
+                effect=Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
+                ],
+            )
+        )
 
         get_job_info_level1_lambda = DockerImageFunction(
             self,
@@ -81,13 +83,15 @@ class OdincalStack(Stack):
             environment=environment,
             function_name="OdincalGetJobInfo",
         )
-        get_job_info_level1_lambda.add_to_role_policy(PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=["ssm:GetParameter"],
-            resources=[
-                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
-            ]
-        ))
+        get_job_info_level1_lambda.add_to_role_policy(
+            PolicyStatement(
+                effect=Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
+                ],
+            )
+        )
 
         calibrate_level1_lambda = DockerImageFunction(
             self,
@@ -104,13 +108,15 @@ class OdincalStack(Stack):
             environment=environment,
             function_name="OdincalImportL1B",
         )
-        calibrate_level1_lambda.add_to_role_policy(PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=["ssm:GetParameter"],
-            resources=[
-                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
-            ]
-        ))
+        calibrate_level1_lambda.add_to_role_policy(
+            PolicyStatement(
+                effect=Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
+                ],
+            )
+        )
 
         # Set up additional permissions
         logconfig.grant_read(preprocess_level1_lambda)
@@ -180,20 +186,14 @@ class OdincalStack(Stack):
                 {
                     "acFile": sfn.JsonPath.string_at("$.name"),
                     "backend": sfn.JsonPath.string_at("$.type"),
-                    "STW1": sfn.JsonPath.number_at(
-                        "$.PreprocessLevel1.Payload.STW1"
-                    ),
-                    "STW2": sfn.JsonPath.number_at(
-                        "$.PreprocessLevel1.Payload.STW2"
-                    ),
+                    "STW1": sfn.JsonPath.number_at("$.PreprocessLevel1.Payload.STW1"),
+                    "STW2": sfn.JsonPath.number_at("$.PreprocessLevel1.Payload.STW2"),
                 },
             ),
             result_path="$.JobInfo",
         )
         preprocess_level1_task.add_catch(
-            job_info_level1_task,
-            errors=["MissingACNeighbours"],
-            result_path="$.Status"
+            job_info_level1_task, errors=["MissingACNeighbours"], result_path="$.Status"
         )
         job_info_level1_task.add_catch(
             self.calibration_stopped,
@@ -221,9 +221,7 @@ class OdincalStack(Stack):
                 {
                     "acFile": sfn.JsonPath.string_at("$.name"),
                     "backend": sfn.JsonPath.string_at("$.type"),
-                    "ScanStarts": sfn.JsonPath.list_at(
-                        "$.JobInfo.Payload.ScanStarts"
-                    ),
+                    "ScanStarts": sfn.JsonPath.list_at("$.JobInfo.Payload.ScanStarts"),
                     "SodaVersion": sfn.JsonPath.number_at(
                         "$.JobInfo.Payload.SodaVersion"
                     ),
@@ -346,13 +344,15 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             function_name="OdincalDateInfo",
         )
-        date_info_lambda.add_to_role_policy(PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=["ssm:GetParameter"],
-            resources=[
-                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
-            ]
-        ))
+        date_info_lambda.add_to_role_policy(
+            PolicyStatement(
+                effect=Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
+                ],
+            )
+        )
 
         scans_info_lambda = Function(
             self,
@@ -367,13 +367,15 @@ class OdincalStack(Stack):
             vpc_subnets=vpc_subnets,
             function_name="OdincalScansInfo",
         )
-        scans_info_lambda.add_to_role_policy(PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=["ssm:GetParameter"],
-            resources=[
-                f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
-            ]
-        ))
+        scans_info_lambda.add_to_role_policy(
+            PolicyStatement(
+                effect=Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:*:*:parameter{PG_ROOT_SSM}/*",
+                ],
+            )
+        )
 
         # Set up additional permissions
         logconfig.grant_read(date_info_lambda)
@@ -389,9 +391,7 @@ class OdincalStack(Stack):
             lambda_function=date_info_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "Scans": sfn.JsonPath.list_at(
-                        "$.CalibrateLevel1.Payload.Scans"
-                    ),
+                    "Scans": sfn.JsonPath.list_at("$.CalibrateLevel1.Payload.Scans"),
                     "File": sfn.JsonPath.string_at("$.name"),
                 },
             ),
@@ -617,9 +617,7 @@ class OdincalStack(Stack):
             lambda_function=get_scan_ids_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "ScansInfo": sfn.JsonPath.list_at(
-                        "$.ScansInfo"
-                    ),
+                    "ScansInfo": sfn.JsonPath.list_at("$.ScansInfo"),
                 },
             ),
             result_path="$.GetScanIDs",
@@ -655,9 +653,7 @@ class OdincalStack(Stack):
             result_path="$.CheckERA5",
             payload=sfn.TaskInput.from_object(
                 {
-                    "ScansInfo": sfn.JsonPath.list_at(
-                        "$.ScansInfo"
-                    ),
+                    "ScansInfo": sfn.JsonPath.list_at("$.ScansInfo"),
                 },
             ),
         )
@@ -685,9 +681,7 @@ class OdincalStack(Stack):
             result_path="$.CheckSolar",
             payload=sfn.TaskInput.from_object(
                 {
-                    "ScansInfo": sfn.JsonPath.list_at(
-                        "$.ScansInfo"
-                    ),
+                    "ScansInfo": sfn.JsonPath.list_at("$.ScansInfo"),
                 },
             ),
         )
@@ -715,9 +709,7 @@ class OdincalStack(Stack):
             result_path="$.CreateZPT",
             payload=sfn.TaskInput.from_object(
                 {
-                    "ScansInfo": sfn.JsonPath.list_at(
-                        "$.ScansInfo"
-                    ),
+                    "ScansInfo": sfn.JsonPath.list_at("$.ScansInfo"),
                     "File": sfn.JsonPath.string_at("$.name"),
                     "Backend": sfn.JsonPath.string_at("$.type"),
                 },
@@ -886,9 +878,7 @@ class OdincalStack(Stack):
             ),
             associate_with_parent=True,
             input_path="$.L2RunInfo",
-            input=sfn.TaskInput.from_object(
-                {"l2_job": sfn.JsonPath.object_at("$")}
-            ),
+            input=sfn.TaskInput.from_object({"l2_job": sfn.JsonPath.object_at("$")}),
             comment="Starts L2 state machine",
         )
 
@@ -911,13 +901,9 @@ class OdincalStack(Stack):
             is_default=False,
             vpc_name="OdinVPC",
         )
-        vpc_subnets = SubnetSelection(
-            subnet_type=SubnetType.PRIVATE_WITH_EGRESS
-        )
+        vpc_subnets = SubnetSelection(subnet_type=SubnetType.PRIVATE_WITH_EGRESS)
         ssm_logconfig = StringParameter.from_string_parameter_name(
-            self,
-            "OdinSMRLogConfig",
-            string_parameter_name=LOG_CONFIG_SSM
+            self, "OdinSMRLogConfig", string_parameter_name=LOG_CONFIG_SSM
         )
 
         activate_level2_task = self.set_up_activate_level2()
