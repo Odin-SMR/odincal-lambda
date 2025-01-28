@@ -15,4 +15,4 @@ def test_read_era5_ok():
 def test_read_era5_fail():
     dates = [date(1976, 9, 18), date(2024, 9, 14)]
     with pytest.raises(FileNotFoundError):
-        ds = get_dataset(dates)
+        get_dataset(dates)

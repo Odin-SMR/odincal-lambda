@@ -26,13 +26,13 @@ RUN yum install python27-devel -y
 COPY get-pip.py .
 RUN python get-pip.py
 COPY requirements.txt .
-RUN pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
+RUN pip install --no-cache-dir -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
 # Install oops and odincal
 COPY --from=build /oops/dist/oops-1.1.1-cp27-cp27mu-linux_x86_64.whl /
 WORKDIR ${LAMBDA_TASK_ROOT}
 COPY ./odincal /odincal
-RUN pip install file:///oops-1.1.1-cp27-cp27mu-linux_x86_64.whl --target "${LAMBDA_TASK_ROOT}"
+RUN pip install --no-cache-dir file:///oops-1.1.1-cp27-cp27mu-linux_x86_64.whl --target "${LAMBDA_TASK_ROOT}"
 RUN PYTHONPATH="${LAMBDA_TASK_ROOT}" pip install /odincal --target "${LAMBDA_TASK_ROOT}"
 
 # Setup handler

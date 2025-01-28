@@ -1,10 +1,10 @@
 import datetime as dt
 
 import s3fs  # type: ignore
-from xarray import Dataset, concat, open_dataset, open_zarr
-from dask import delayed
-import zarr
-import zarr.storage
+from xarray import Dataset, concat, open_zarr
+from dask import delayed  # type: ignore
+import zarr  # type: ignore
+import zarr.storage  # type: ignore
 
 ERA5_BUCKET = "odin-era5"
 ERA5_PATTERN = "{year}/{month:02d}/ea_pl_{date}.zarr"
@@ -34,7 +34,7 @@ def read_zarr_dataset(
     dates: list[dt.date],
 ) -> Dataset:
     files = [
-        f"{ERA5_BUCKET}/{ERA5_PATTERN.format(year=date.year, month=date.month, date=date.isoformat())}"
+        f"{ERA5_BUCKET}/{date.year}/{date.month:02d}/ea_pl_{date.isoformat()}.zarr"
         for date in dates
     ]
     tasks = [read_dataset(f) for f in files]

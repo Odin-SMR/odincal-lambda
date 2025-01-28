@@ -32,19 +32,19 @@ class Donaletty:
         """
         scan_datetime = to_datetime(scan_data.DateMid.data).to_pydatetime()
         msisT = extractPTZprofilevarsolar(
-            scan_datetime,
+            scan_datetime[0],
             scan_data.LatMid,
             scan_data.LonMid,
             MSISZ,
         )["T"]
-        z = np.r_[scan_data.era5_gmh.data, MSISZ]
-        temp = np.r_[scan_data.era5_t, msisT]
+        z = np.r_[scan_data.era5_gmh.data.flatten(), MSISZ]
+        temp = np.r_[scan_data.era5_t.data.flatten(), msisT]
         normrho = (
-            np.interp([20], scan_data.era5_gmh.data, scan_data.era5_level.data)
+            np.interp([20], scan_data.era5_gmh.data.flatten(), scan_data.era5_level.data.flatten())
             * 28.9644
             / 1000
             / IDEALGAS
-            / np.interp([20], scan_data.era5_gmh.data, scan_data.era5_t.data)
+            / np.interp([20], scan_data.era5_gmh.data.flatten(), scan_data.era5_t.data.flatten())
         )
         newT, newp, _, _, _, _, _ = intatm(
             z, temp, newz, 20, normrho[0], scan_data.LatMid.item()

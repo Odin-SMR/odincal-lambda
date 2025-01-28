@@ -10,12 +10,14 @@
 
 
 DEVELOPER_ENV := requirements-dev.in
+DO_NOT_PROPAGATE1 := '*/create_zpt/*'
+DO_NOT_PROPAGATE1 := '*/odin_cal/*'
 
 PIP_COMPILE := pip-compile -q --no-header --resolver=backtracking
 CONSTRAINTS_ENV := $(addsuffix .txt, $(basename $(DEVELOPER_ENV)))
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 CURRENT_DIR := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
-SOURCES := $(shell find . -name 'requirements*.in' -not -name $(DEVELOPER_ENV))
+SOURCES := $(shell find . -name 'requirements*.in' -not -path '*/cdk.out/*' -not -path ${DO_NOT_PROPAGATE1} -not -path ${DO_NOT_PROPAGATE}2 -not -name $(DEVELOPER_ENV))
 
 help:
 	@sed -rn 's/^## ?//;T;p' $(MAKEFILE_LIST)
