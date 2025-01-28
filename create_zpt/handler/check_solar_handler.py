@@ -4,9 +4,9 @@
 import datetime as dt
 from typing import Any
 
-from pandas import Timestamp  # type: ignore
-from pyarrow import dataset as ds  # type: ignore
-from pyarrow.fs import FileSystem, S3FileSystem  # type: ignore
+from pandas import Timestamp
+from pyarrow import dataset as ds
+from pyarrow.fs import FileSystem, S3FileSystem
 
 from .time_util import mjd2datetime
 from .log_configuration import logconfig

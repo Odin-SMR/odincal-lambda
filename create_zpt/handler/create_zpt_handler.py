@@ -5,9 +5,9 @@ import datetime as dt
 import os
 from typing import Any
 
-from pandas import DataFrame, Timestamp  # type: ignore
+from pandas import DataFrame, Timestamp
 from xarray import Dataset
-import pyarrow as pa  # type: ignore
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 

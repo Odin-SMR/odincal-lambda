@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import xarray
-from pandas import to_datetime  # type: ignore
+from pandas import to_datetime
 
 from .atmos import intatm, IDEALGAS
 from .msis90 import extractPTZprofilevarsolar

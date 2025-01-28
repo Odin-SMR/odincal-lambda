@@ -2,9 +2,9 @@ import datetime as dt
 
 import s3fs  # type: ignore
 from xarray import Dataset, concat, open_zarr
-from dask import delayed  # type: ignore
-import zarr  # type: ignore
-import zarr.storage  # type: ignore
+from dask import delayed
+import zarr
+import zarr.storage
 
 ERA5_BUCKET = "odin-era5"
 ERA5_PATTERN = "{year}/{month:02d}/ea_pl_{date}.zarr"

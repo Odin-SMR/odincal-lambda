@@ -324,7 +324,7 @@ class OdincalStack(Stack):
         code = Code.from_asset(
             "cache_tables",
             bundling={
-                "image": Runtime.PYTHON_3_10.bundling_image,
+                "image": Runtime.PYTHON_3_11.bundling_image,
                 "command": [
                     "bash",
                     "-c",
@@ -340,7 +340,7 @@ class OdincalStack(Stack):
             handler="handler.date_info.handler",
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            runtime=Runtime.PYTHON_3_10,
+            runtime=Runtime.PYTHON_3_11,
             memory_size=256,
             vpc=vpc,
             vpc_subnets=vpc_subnets,
@@ -361,7 +361,7 @@ class OdincalStack(Stack):
             handler="handler.scans_info.handler",
             timeout=LAMBDA_TIMEOUT,
             architecture=Architecture.X86_64,
-            runtime=Runtime.PYTHON_3_10,
+            runtime=Runtime.PYTHON_3_11,
             memory_size=256,
             vpc=vpc,
             vpc_subnets=vpc_subnets,

@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import TypedDict
 
 import numpy as np
-import pyarrow.dataset as ds  # type: ignore
+import pyarrow.dataset as ds
 from nrlmsise00 import msise_model  # type: ignore
 from s3fs import S3FileSystem  # type: ignore
 
