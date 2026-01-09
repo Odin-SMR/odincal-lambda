@@ -1,5 +1,4 @@
-"""Create and store ZPT file for input
-"""
+"""Create and store ZPT file for input"""
 
 import datetime as dt
 import os

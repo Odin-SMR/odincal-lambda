@@ -1,5 +1,4 @@
-"""Check if data is available in the ERA5 DB for creating ZPT for the file
-"""
+"""Check if data is available in the ERA5 DB for creating ZPT for the file"""
 
 import datetime as dt
 from typing import Any

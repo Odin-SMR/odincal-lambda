@@ -1,5 +1,4 @@
-""" Check if ZPT file already exists for the file being processed.
-"""
+"""Check if ZPT file already exists for the file being processed."""
 
 import os
 from typing import Any
