@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
     stacks:
-        runs-on: ubuntu-20.04
+        runs-on: ubuntu-22.04
         steps:
         - uses: actions/checkout@v2
 
@@ -26,7 +26,7 @@ jobs:
             tox
 
     odincal:
-        runs-on: ubuntu-20.04
+        runs-on: ubuntu-22.04
         steps:
         - uses: actions/checkout@v2
 
