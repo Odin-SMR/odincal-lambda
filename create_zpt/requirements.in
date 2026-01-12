@@ -1,8 +1,9 @@
-pyarrow
-zarr
-pandas
-xarray
-s3fs
+dask[array,dataframe]
 nrlmsise00
-scipy
+pandas
+pyarrow
 pyyaml
+s3fs
+scipy
+xarray
+zarr

@@ -1,13 +1,14 @@
-"""Create and store ZPT file for input
-"""
+"""Create and store ZPT file for input"""
+
 import datetime as dt
 import os
 from typing import Any
 
-from pandas import DataFrame, Timestamp  # type: ignore
-from xarray import DataArray
-import pyarrow as pa  # type: ignore
-import pyarrow.parquet as pq  # type: ignore
+from pandas import DataFrame, Timestamp
+from xarray import Dataset
+import pyarrow as pa
+import pyarrow.parquet as pq
+
 
 from .check_zpt_handler import ZPT_BUCKET, ZPT_PATTERN
 from .era5_dataset import get_dataset as get_era5
@@ -22,7 +23,7 @@ from .log_configuration import logconfig
 AWS_REGION = "eu-north-1"
 
 
-def get_scan_data(scans_info: list[dict[str, Any]]) -> DataArray:
+def get_scan_data(scans_info: list[dict[str, Any]]) -> Dataset:
     data = []
     for d in scans_info:
         data.extend(d["ScansInfo"])
@@ -35,9 +36,7 @@ def get_scan_data(scans_info: list[dict[str, Any]]) -> DataArray:
         df["LatEnd"],
         df["LonEnd"],
     )
-    df["DateMid"] = df["MJDMid"].apply(
-        lambda x: mjd2datetime(x).replace(tzinfo=None)
-    )
+    df["DateMid"] = df["MJDMid"].apply(lambda x: mjd2datetime(x).replace(tzinfo=None))
 
     scans = df.set_index("ScanID").to_xarray()
     scans.ScanID.attrs = parameter_desc["scanid"]
@@ -60,45 +59,9 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     logconfig()
     scans = get_scan_data(event["ScansInfo"])
 
-    dates: list[dt.date] = list(set(
-        Timestamp(d).date() for d in scans.DateMid.values
-    ))
-    dates.sort()
-    era5_data = get_era5(dates)
-    era5_data["longitude"] = era5_data.longitude - 180
+    era5_data = read_era5(scans)
 
-    scans["era5_level"] = era5_data.level
-    scans["era5_z"] = (
-        ["ScanID", "level"],
-        era5_data.z.sel(
-            latitude=scans["LatMid"],
-            longitude=scans["LonMid"],
-            time=scans["DateMid"],
-            method="nearest",
-        ).data,
-    )
-    scans.era5_z.attrs = era5_data.z.attrs
-    scans["era5_t"] = (
-        ["ScanID", "level"],
-        era5_data.t.sel(
-            latitude=scans["LatMid"],
-            longitude=scans["LonMid"],
-            time=scans["DateMid"],
-            method="nearest",
-        ).data,
-    )
-    scans.era5_t.attrs = era5_data.t.attrs
-    scans["era5_gmh"] = gmh(scans.LatMid, scans.era5_z)
-    scans.era5_gmh.attrs = {
-        "long_name": "geometric height",
-        "units": "km",
-    }
-    # pressure in mb:
-    scans["theta"] = scans["era5_t"] * (1e3 / scans["level"]) ** 0.286
-    scans.theta.attrs = {
-        "long_name": "Potential temperature",
-        "units": "K",
-    }
+    scans = merge_era5(scans, era5_data)
 
     donaletty = Donaletty()
     profiles = donaletty.makeprofile(scans)
@@ -125,3 +88,47 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     return {
         "StatusCode": 201,
     }
+
+
+def read_era5(scans: Dataset) -> Dataset:
+    dates: list[dt.date] = list(set(Timestamp(d).date() for d in scans.DateMid.values))
+    dates.sort()
+    era5_data = get_era5(dates)
+    era5_data["longitude"] = era5_data.longitude - 180
+    return era5_data
+
+
+def merge_era5(ds: Dataset, era5: Dataset) -> Dataset:
+    ds["era5_level"] = era5.level
+    ds["era5_z"] = (
+        ["ScanID", "level"],
+        era5.z.sel(
+            latitude=ds["LatMid"],
+            longitude=ds["LonMid"],
+            time=ds["DateMid"],
+            method="nearest",
+        ).data,
+    )
+    ds.era5_z.attrs = era5.z.attrs
+    ds["era5_t"] = (
+        ["ScanID", "level"],
+        era5.t.sel(
+            latitude=ds["LatMid"],
+            longitude=ds["LonMid"],
+            time=ds["DateMid"],
+            method="nearest",
+        ).data,
+    )
+    ds.era5_t.attrs = era5.t.attrs
+    ds["era5_gmh"] = gmh(ds.LatMid, ds.era5_z)
+    ds.era5_gmh.attrs = {
+        "long_name": "geometric height",
+        "units": "km",
+    }
+    # pressure in mb:
+    ds["theta"] = ds["era5_t"] * (1e3 / ds["level"]) ** 0.286
+    ds.theta.attrs = {
+        "long_name": "Potential temperature",
+        "units": "K",
+    }
+    return ds

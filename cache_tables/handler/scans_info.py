@@ -102,10 +102,12 @@ def update_scans(
     scan_url = "rest_api/v5/level1/{freqmode}/{scan_id}/Log/"
 
     for scan_id in date_info["Scans"]:
-        scan_log = get_odin_data(scan_url.format(
-            freqmode=freqmode,
-            scan_id=scan_id,
-        ))
+        scan_log = get_odin_data(
+            scan_url.format(
+                freqmode=freqmode,
+                scan_id=scan_id,
+            )
+        )
         if scan_log is None:
             continue
         scan_log = scan_log["Data"]

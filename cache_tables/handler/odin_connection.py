@@ -15,11 +15,11 @@ PSQL_BUCKET = "odin-psql"
 def odin_connection(credentials):
     """Connects to the database, returns a connection"""
     connection_string = (
-        "host={0} ".format(credentials.host) +
-        "dbname={0} ".format(credentials.db) +
-        "user={0} ".format(credentials.user) +
-        "password={0} ".format(credentials.password) +
-        "sslmode=verify-ca"
+        "host={0} ".format(credentials.host)
+        + "dbname={0} ".format(credentials.db)
+        + "user={0} ".format(credentials.user)
+        + "password={0} ".format(credentials.password)
+        + "sslmode=verify-ca"
     )
     connection = connect(connection_string)
     return connection
@@ -42,7 +42,7 @@ def download_file(
 
 
 def setup_postgres(psql_dir: str, psql_bucket: str = PSQL_BUCKET) -> None:
-    s3_client = boto3.client('s3')
+    s3_client = boto3.client("s3")
 
     # Setup SSL for Postgres
     pg_cert_path = download_file(

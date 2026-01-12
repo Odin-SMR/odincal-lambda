@@ -1,5 +1,5 @@
-""" Check if ZPT file already exists for the file being processed.
-"""
+"""Check if ZPT file already exists for the file being processed."""
+
 import os
 from typing import Any
 
@@ -16,7 +16,7 @@ class NoZPTError(Exception):
     pass
 
 
-def assert_zpt_exists(
+def assert_era5_exists(
     filename: str,
     prefix: str,
     backend: str,
@@ -30,7 +30,7 @@ def assert_zpt_exists(
                 backend=backend,
                 prefix=prefix,
                 filename=filename,
-            )
+            ),
         ).load()
     except ClientError as err:
         raise NoZPTError(f"No ERA5 data found for {filename} ({err})")
@@ -44,7 +44,7 @@ def handler(event: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
 
     s3_client = boto3.resource("s3")
     try:
-        assert_zpt_exists(filename, prefix, backend, s3_client)
+        assert_era5_exists(filename, prefix, backend, s3_client)
     except NoZPTError:
         return {"StatusCode": 404}
 

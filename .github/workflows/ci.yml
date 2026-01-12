@@ -3,53 +3,88 @@ name: Odin SMR L1 processing CI
 on: [push]
 
 jobs:
-    stacks:
-        runs-on: ubuntu-latest
-        steps:
-        - uses: actions/checkout@v2
+  stacks:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
 
-        - name: Setup Python
-          uses: actions/setup-python@v2
-          with:
-            python-version: '3.10'
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.11"
 
-        - name: Install General Dependencies
-          run: |
-            python3.10 -m pip install --upgrade pip
-            pip install tox
+      - name: Install General Dependencies
+        run: |
+          python3.11 -m pip install --upgrade pip
+          pip install tox
 
-        - name: Run unit tests
-          env:
-            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          run: |
-            tox
+      - name: Run unit tests
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          tox
 
-    odincal:
-        runs-on: ubuntu-20.04
-        steps:
-        - uses: actions/checkout@v2
+  odincal:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
 
-        - name: Install General Dependencies
-          run: |
-            sudo apt install python2.7-dev
-            wget -c https://bootstrap.pypa.io/pip/2.7/get-pip.py
-            python2.7 get-pip.py
-            python2.7 -m pip install --upgrade pip
-            pip install tox
+      - name: Install General Dependencies
+        run: |
+          sudo apt install python2.7-dev
+          wget -c https://bootstrap.pypa.io/pip/2.7/get-pip.py
+          python2.7 get-pip.py
+          python2.7 -m pip install --upgrade pip
+          pip install tox
 
-        - name: build Library
-          run: |
-            cd odincal/oops/Library
-            CFLAGS=-fPIC ./configure
-            make
+      - name: build Library
+        run: |
+          cd odincal/oops/Library
+          CFLAGS=-fPIC ./configure
+          make
 
-        - name: Run unit tests oops
-          run: |
-            cd odincal/oops
-            tox
+      - name: Run unit tests oops
+        run: |
+          cd odincal/oops
+          tox
 
-        - name: Run unit tests odincal
-          run: |
-            cd odincal/odincal
-            tox
+      - name: Run unit tests odincal
+        run: |
+          cd odincal/odincal
+          tox
+
+  cdk-synth:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install aws-cdk
+        run: |
+          npm install -g aws-cdk
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5.1.1
+        with:
+          role-to-assume: arn:aws:iam::991049544436:role/OdinGithubRole
+          aws-region: eu-north-1
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install General Dependencies
+        run: pip install -r requirements.txt
+
+      - name: CDK Synth
+        run: cdk synth

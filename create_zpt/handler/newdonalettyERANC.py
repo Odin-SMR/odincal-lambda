@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import xarray
-from pandas import to_datetime  # type: ignore
+from pandas import to_datetime
 
 from .atmos import intatm, IDEALGAS
 from .msis90 import extractPTZprofilevarsolar
@@ -32,22 +32,28 @@ class Donaletty:
         """
         scan_datetime = to_datetime(scan_data.DateMid.data).to_pydatetime()
         msisT = extractPTZprofilevarsolar(
-            scan_datetime,
+            scan_datetime[0],
             scan_data.LatMid,
             scan_data.LonMid,
             MSISZ,
         )["T"]
-        z = np.r_[scan_data.era5_gmh.data, MSISZ]
-        temp = np.r_[scan_data.era5_t, msisT]
+        z = np.r_[scan_data.era5_gmh.data.flatten(), MSISZ]
+        temp = np.r_[scan_data.era5_t.data.flatten(), msisT]
         normrho = (
-            np.interp([20], scan_data.era5_gmh.data, scan_data.era5_level.data)
+            np.interp(
+                [20],
+                scan_data.era5_gmh.data.flatten(),
+                scan_data.era5_level.data.flatten(),
+            )
             * 28.9644
             / 1000
             / IDEALGAS
-            / np.interp([20], scan_data.era5_gmh.data, scan_data.era5_t.data)
+            / np.interp(
+                [20], scan_data.era5_gmh.data.flatten(), scan_data.era5_t.data.flatten()
+            )
         )
         newT, newp, _, _, _, _, _ = intatm(
-            z, temp, newz, 20, normrho[0], scan_data.LatMid.item(),
+            z, temp, newz, 20, normrho[0], scan_data.LatMid.item()
         )
         zpt = xarray.Dataset(
             data_vars=dict(
@@ -60,21 +66,20 @@ class Donaletty:
         )
         return zpt
 
-    def interpolate_gmh(
-            self,  da: xarray.DataArray, ecmz: np.ndarray
-    ) -> xarray.DataArray:
+    def interpolate_gmh(self, da: xarray.Dataset, ecmz: np.ndarray) -> xarray.Dataset:
         logger.debug("interpolating scanid %s", da.ScanID.values)
-        interpolated = da.squeeze().swap_dims(level="era5_gmh").interp(
-                era5_gmh=ecmz, kwargs={"fill_value": 273}
-                )
+        interpolated = (
+            da.squeeze()
+            .swap_dims(level="era5_gmh")
+            .interp(era5_gmh=ecmz, kwargs={"fill_value": 273})
+        )
         return interpolated
 
-    def makeprofile(self, scans: xarray.DataArray):
+    def makeprofile(self, scans: xarray.Dataset):
         ecmz = np.arange(45)
         newz = np.arange(151)
         scan_on_interp_gmh = scans.groupby("ScanID").map(
-            func=self.interpolate_gmh,
-            args=(ecmz,)
+            func=self.interpolate_gmh, args=(ecmz,)
         )
         zpt_donaletty = scan_on_interp_gmh.groupby("ScanID").map(
             self.donaletty, args=(newz,)
