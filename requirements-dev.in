@@ -1,14 +1,10 @@
 black[jupyter]
 boto3
-black[jupyter]
-boto3
 boto3-stubs[lambda,stepfunctions,s3]
 mockito
 mypy
 pandas-stubs
-pandas-stubs
 pip-tools
-pyarrow-stubs
 pyarrow-stubs
 pytest
 tox

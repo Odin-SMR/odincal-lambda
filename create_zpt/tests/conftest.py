@@ -7,7 +7,7 @@ import pytest
 
 @pytest.fixture(autouse=True, scope="session")
 def aws_environment():
-    profile_name = "odin-cdk"
+    profile_name = "odin"
     session = boto3.Session(profile_name=profile_name)
     credentials = session.get_credentials()
     if credentials:
