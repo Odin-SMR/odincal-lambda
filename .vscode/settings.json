@@ -1,0 +1,25 @@
+{
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "postgres",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "odin",
+            "database": "odin",
+            "username": "odin",
+            "password": "odin"
+        }
+    ],
+    "[python]": {
+        "editor.rulers": [
+            88
+        ]
+    },
+    "[markdown]": {
+        "editor.rulers": [
+            88
+        ]
+    }
+}

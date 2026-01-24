@@ -1,0 +1,50 @@
+{
+  "name": "odin-l1-workflow devcontainer",
+  "dockerComposeFile": "compose.devcontainer.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "features": {
+    // "ghcr.io/devcontainers/features/common-utils:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    // "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/rails/devcontainer/features/postgres-client:1": {},
+    "ghcr.io/devcontainer-community/devcontainer-features/astral.sh-uv:1": {}
+  },
+  "remoteEnv": {
+    "PATH": "/usr/local/share/nvm/versions/node/v22.22.0/bin:${containerEnv:PATH}"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/workspace/.venv/bin/python",
+        "python.terminal.activateEnvironment": true
+      },
+      "extensions": [
+        "astral-sh.ty",
+        "charliermarsh.ruff",
+        "github.copilot-chat",
+        "GitHub.copilot",
+        "github.vscode-pull-request-github",
+        "ms-azuretools.vscode-docker",
+        "ms-python.debugpy",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "redhat.vscode-yaml",
+        "yzhang.markdown-all-in-one",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+        "ms-toolsai.jupyter@2025.8.0",
+        "ms-toolsai.datawrangler",
+        "marvhen.reflow-markdown"
+      ]
+    }
+  },
+  // "forwardPorts": [
+  //   5432,
+  //   4566
+  // ],
+  "postCreateCommand": "bash .devcontainer/post-create.sh || true"
+}
