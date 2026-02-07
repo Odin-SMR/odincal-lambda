@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -87,11 +87,10 @@ def upsert_df(
         buf,
         index=False,
         header=False,
-        quoting=csv.QUOTE_MINIMAL,  # important: "{1,2,3}" contains commas -> quote in CSV
-        na_rep="",  # pandas will emit empty field; COPY CSV treats it as NULL by default
+        quoting=csv.QUOTE_MINIMAL,  # important: "{1,2,3}" contains commas->quote in CSV
+        na_rep="",  # emty field, COPY CSV treats it as NULL by default
     )
     buf.seek(0)
-
     with psycopg.connect(conn_str) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -99,10 +98,12 @@ def upsert_df(
                     sql.Identifier(schema), sql.Identifier(tmp_table)
                 )
             )
-
             cur.execute(
                 sql.SQL(
-                    "CREATE TEMP TABLE {} (LIKE {}.{} INCLUDING DEFAULTS) ON COMMIT DROP"
+                    obj=(
+                        "CREATE TEMP TABLE {} (LIKE {}.{} "
+                        "INCLUDING DEFAULTS) ON COMMIT DROP"
+                    )
                 ).format(
                     sql.Identifier(tmp_table),
                     sql.Identifier(schema),
@@ -110,7 +111,9 @@ def upsert_df(
                 )
             )
 
-            copy_sql = sql.SQL("COPY {} ({}) FROM STDIN WITH (FORMAT csv)").format(
+            copy_sql = sql.SQL(
+                obj=("COPY {} ({}) FROM STDIN WITH (FORMAT csv)")
+            ).format(
                 sql.Identifier(tmp_table),
                 sql.SQL(", ").join(map(sql.Identifier, cols)),
             )

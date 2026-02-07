@@ -13,3 +13,15 @@ dev = [
     "matplotlib>=3.10.8",
     "numpy>=2.4.1",
 ]
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+fix = true
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E203"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

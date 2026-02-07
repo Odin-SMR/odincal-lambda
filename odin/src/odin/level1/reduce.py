@@ -1,127 +1,156 @@
 from __future__ import annotations
-import pandas as pd
-import numpy as np
+
 from typing import Protocol
-from math import pi, exp, sqrt
+
+import numpy as np
+import pandas as pd
+
+LAGSPERCHIP = 96
 
 
 class HasACData(Protocol):
     ac: pd.DataFrame
+    housekeeping: pd.DataFrame
 
 
 class ReducerMixin:
     def reduce(self: HasACData) -> pd.DataFrame:
-        l1a = Level1a()
-        df = pd.DataFrame()
-        df["stw"] = self.ac.index
-        spectra = []
-        for row_cc, row_mon in self.ac[["cc", "mon"]].itertuples(index=False):
-            l1a.reduceAC(
-                row_cc,
-                row_mon[:, 0],
-                row_mon[:, 1],
-            )
-            sp = np.stack(l1a.got)
-            spectra.append(sp)
-        df["spectra"] = list(np.stack(spectra))
+        """Compute spectra for all AC rows in a vectorised fashion."""
+
+        if self.ac.empty:
+            # Preserve behaviour for an empty input frame.
+            return pd.DataFrame(columns=["spectra"]).set_index(pd.Index([], name="stw"))
+
+        # "cc" has shape (nbands, nlag) per row and "mon" has shape
+        # (nbands, 2).  We stack them into dense arrays of shape
+        # (nrows, nbands, ...).
+        cc_all = np.stack(self.ac["cc"].to_numpy()) * (
+            224e6 / self.housekeeping["adjusted_clock"].to_numpy()[:, None, None]
+        )
+        mon_all = np.stack(self.ac["mon"].to_numpy()) * (
+            224e6 / self.housekeeping["adjusted_clock"].to_numpy()[:, None, None]
+        )
+
+        spectra = reduce_ac(
+            cc_all,
+            mon_all[:, :, 0],  # monitor_pos
+            mon_all[:, :, 1],  # monitor_neg
+        )
+        # mask = (spectra == 0.0).all(axis=2,keepdims=True)  # shape (n, 8)
+        # print(mask.shape, mask.dtype, spectra.shape, spectra.dtype)
+        # mask = np.repeat(mask, 112, axis=2)
+        # spectra[mask] = np.nan
+
+        df = pd.DataFrame({"stw": self.ac.index})
+        # Store one 2D spectrum per row, keeping the public interface
+        # unchanged (a column of ndarray objects).
+        df["spectra"] = list(spectra)
         return df.set_index("stw")
 
 
-class Level1a:
-    """A class to process level 0 files into level 1a."""
+def reduce_ac(
+    cc_data: np.ndarray,
+    acd_mon_pos: np.ndarray,
+    acd_mon_neg: np.ndarray,
+) -> np.ndarray:
+    """Vectorised AC reduction.
 
-    def __init__(self, old: bool = False):
-        self.LAGSPERCHIP = 96
-        self.CLOCKFREQ = 224.0e6
-        self.SAMPLEFREQ = 10.0e6
-        self.old = old
+    Parameters
+    ----------
+    cc_data
+        Correlation data, shape ``(nrows, nbands, nlag)``.
+    acd_mon_pos, acd_mon_neg
+        Monitor values, shape ``(nrows, nbands)``.
 
-    def reduceAC(self, cc_data, acd_mon_pos, acd_mon_neg):
-        self.got = []
-        for i in range(len(cc_data)):
-            self.maxchips = len(cc_data[i]) // 96
-            self.nred = self.maxchips * 112
-            datamod = np.zeros((1, self.nred))
-            datamod[0, 0 : self.maxchips * self.LAGSPERCHIP] = cc_data[i]
-            goti = self.reduce1Band(datamod[0, :], acd_mon_pos[i], acd_mon_neg[i])
-            if goti[0] == 1:
-                self.got.append(goti[1])
-            else:
-                self.got.append(np.zeros(shape=(self.nred,)))
-
-    def reduce1Band(self, data, monitor_pos, monitor_neg):
-        zlag = data[0]
-        if zlag <= 0:
-            return 0, 0
-        if zlag > 1:
-            return 0, 0
-        power = zeroLag(zlag, 1.0)
-        c_pos = threshold(monitor_pos)
-        c_neg = threshold(monitor_neg)
-        if c_pos == 0 or c_neg == 0:
-            print("zero monitor value")
-            return 0, 0
-        else:
-            cmean = (c_pos + c_neg) / 2.0
-            dc = abs((c_pos - c_neg) / 2.0 / cmean)
-            if dc > 0.1:
-                print("too high monitor difference")
-                return 0, 0
-        data = qCorrect(cmean, data, self.nred)
-        if data[0] == 0:
-            print("quantisation correction failed")
-            return 0, 0
-
-        hanning_inplace(data[1])
-        # data0 = np.array(data[1], dtype=np.float64, copy=True)
-        data0 = odinfft_numpy_no_hann(data[1])
-
-        data0 = data0 * power
-        return 1, np.stack(data0)
-
-
-def odinfft_numpy_no_hann(lags: np.ndarray) -> np.ndarray:
+    Returns
+    -------
+    np.ndarray
+        Spectra with shape ``(nrows, nbands, nred)`` where
+        ``nred = 112 * maxchips`` and ``maxchips = nlag // LAGSPERCHIP``.
     """
-    NumPy version of odinfft() with the Hanning step removed.
 
-    Input:
-      lags: shape (n,), float64-ish, where n = 112 * maxchips and n % 7 == 0
+    cc = np.asarray(cc_data, dtype=np.float64)
+    mon_pos = np.asarray(acd_mon_pos, dtype=np.float64)
+    mon_neg = np.asarray(acd_mon_neg, dtype=np.float64)
 
-    Output:
-      out: shape (n,), float64
-           spectrum-like values packed into 7 blocks of size n/7,
-           mimicking the final rearrangement in odinfft().
-    """
-    x = np.asarray(lags, dtype=np.float64)
-    n = x.size
-    if n % 7 != 0:
-        raise ValueError(f"n must be a multiple of 7, got n={n}")
+    nrows, nbands, nlag = cc.shape
+    maxchips = nlag // LAGSPERCHIP
+    nred = maxchips * 112
 
-    # 1) Even/symmetric expansion around x[0] (matches the comment in the C code)
-    #    [x0, x1, ..., x(n-1), 0, x(n-1), ..., x1]  length = 2n
-    x2 = np.concatenate([x, [0.0], x[:0:-1]])
+    # Pad from 96 lags per band to 112 lags as in the original
+    # implementation.
+    datamod = np.zeros((nrows, nbands, nred), dtype=np.float64)
+    datamod[:, :, :nlag] = cc
 
-    # 2) Real FFT of the even sequence -> should be (numerically) real for perfect even symmetry
-    #    rfft gives bins 0..n (inclusive), so length n+1
-    X = np.fft.rfft(x2)
+    # Flatten rows and bands into a single "band index" to simplify
+    # vectorised operations.
+    nb = nrows * nbands
+    data_flat = datamod.reshape(nb, nred)
+    mon_pos_flat = mon_pos.reshape(nb)
+    mon_neg_flat = mon_neg.reshape(nb)
 
-    # For an even real sequence, imag part should be ~0; keep real part.
-    # Drop the Nyquist bin so we have exactly n outputs (like odinfft overwrites n samples).
-    bins = X.real[:n]  # shape (n,)
+    # --- zero-lag / monitor checks ---------------------------------
 
-    return bins
+    zlag = data_flat[:, 0]
+    mask_zlag = (zlag > 0.0) & (zlag <= 1.0)
 
+    power = np.zeros(nb, dtype=np.float64)
+    power[mask_zlag] = zero_lag(zlag[mask_zlag], 1.0)
 
-def hanning_inplace(data):
-    n = data.shape[0]
-    i = np.arange(n)
-    w = 0.5 + 0.5 * np.cos(np.pi * i / n)
-    data *= w
+    c_pos = threshold(mon_pos_flat)
+    c_neg = threshold(mon_neg_flat)
 
+    mask_mon = mask_zlag & (c_pos != 0.0) & (c_neg != 0.0)
 
-# def blended_window(n: int, alpha: float) -> np.ndarray:
-#     w = (n)
-#     return 1.0 - alpha + alpha*w
+    cmean = np.zeros(nb, dtype=np.float64)
+    dc = np.zeros(nb, dtype=np.float64)
+    idx_mon = np.nonzero(mask_mon)[0]
+    if idx_mon.size > 0:
+        cmean[idx_mon] = (c_pos[idx_mon] + c_neg[idx_mon]) / 2.0
+        dc[idx_mon] = np.abs((c_pos[idx_mon] - c_neg[idx_mon]) / (2.0 * cmean[idx_mon]))
+
+    mask_dc = mask_mon & (dc <= 0.1)
+
+    # --- Quantisation correction (Kulkarni & Heiles) ---------------
+
+    data_qc = np.zeros_like(data_flat)
+    mask_q_input = mask_dc
+    idx_q = np.nonzero(mask_q_input)[0]
+    good_q = np.zeros(nb, dtype=bool)
+    if idx_q.size > 0:
+        band_good, out_q = q_correct(cmean[idx_q], data_flat[idx_q])
+        # Map results back into the full-band index space.
+        data_qc[idx_q] = out_q
+        good_q[idx_q[band_good]] = True
+
+    valid = good_q
+
+    # --- Hanning window and FFT ------------------------------------
+
+    spectra_flat = np.zeros_like(data_flat)
+    idx_valid = np.nonzero(valid)[0]
+    if idx_valid.size > 0:
+        lags = data_qc[idx_valid]
+
+        # Hanning window.
+        n = nred
+        i = np.arange(n, dtype=np.float64)
+        w = 0.5 + 0.5 * np.cos(np.pi * i / n)
+        lags *= w
+
+        # FFT
+        x = lags
+        x2 = np.concatenate(
+            [x, np.zeros((x.shape[0], 1)), x[:, :0:-1]],
+            axis=1,
+        )
+        X = np.fft.rfft(x2, axis=1)
+        bins = X.real[:, :nred]
+
+        bins *= power[idx_valid][:, None]
+        spectra_flat[idx_valid] = bins
+
+    return spectra_flat.reshape(nrows, nbands, nred)
 
 
 def inv_erfc(z):
@@ -133,30 +162,73 @@ def inv_erfc(z):
     return y
 
 
-def threshold(monitor):
-    if monitor < 0.0 or monitor > 1.0:
-        return 0.0
-    thr = sqrt(2.0) * inv_erfc(2.0 * monitor)
+def threshold(monitor: np.ndarray) -> np.ndarray:
+    """Vectorised version of :func:`threshold`.
+
+    Values outside the valid interval ``[0, 1]`` yield 0, matching the
+    scalar behaviour.
+    """
+
+    monitor = np.asarray(monitor, dtype=np.float64)
+    thr = np.zeros_like(monitor)
+    valid = (monitor >= 0.0) & (monitor <= 1.0)
+    thr[valid] = np.sqrt(2.0) * inv_erfc(2.0 * monitor[valid])
     return thr
 
 
-def qCorrect(c, f, n):
-    # Perform quantisation correction using Kulkarni & Heiles approximation.
-    # (taken from Kulkarni, S.R., Heiles, C., 1980, AJ, 85, 1413.
-    A = (pi / 2.0) * exp(c * c)
-    B = -A * A * A * (pow((c * c - 1), 2.0) / 6.0)
-    f[0] = 1.0
-    for i in range(1, n):
-        fa = f[i]
-        if abs(fa) > 0.86:
-            # level too high in QCorrect
-            return 0, 0
-        f[i] = (A + B * fa * fa) * fa
-    return 1, f
+def zero_lag(zlag: np.ndarray, v: float) -> np.ndarray:
+    """Vectorised analogue of :func:`zeroLag` for array inputs."""
+
+    zlag = np.asarray(zlag, dtype=np.float64)
+    out = np.zeros_like(zlag)
+    valid = (zlag < 1.0) & (zlag > 0.0)
+    if not np.any(valid):
+        return out
+    x = v / inv_erfc(zlag[valid])
+    out[valid] = x * x / 2.0
+    return out
 
 
-def zeroLag(zlag, v):
-    if zlag >= 1.0 or zlag <= 0.0:
-        return 0.0
-    x = v / inv_erfc(zlag)
-    return x * x / 2.0
+def q_correct(c: np.ndarray, f: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Vectorised quantisation correction.
+
+    Parameters
+    ----------
+    c
+        Mean monitor values per band, shape ``(nbands,)``.
+    f
+        Input lags per band, shape ``(nbands, nred)``.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        ``(ok, corrected)`` where ``ok`` has shape ``(nbands,)`` and is
+        ``True`` for bands that pass the Kulkarni & Heiles constraint
+        (no lag with ``|fa| > 0.86``), and ``corrected`` contains the
+        corrected lags (with ``f[:, 0]`` set to 1.0).
+    """
+
+    c = np.asarray(c, dtype=np.float64)
+    f = np.asarray(f, dtype=np.float64)
+
+    nbands, nred = f.shape
+
+    A = (np.pi / 2.0) * np.exp(c * c)
+    B = -A * A * A * ((c * c - 1.0) ** 2.0 / 6.0)
+
+    out = np.zeros_like(f)
+    out[:, 0] = 1.0
+
+    fa = f[:, 1:]
+    bad = np.abs(fa) > 0.86
+    ok = ~np.any(bad, axis=1)
+
+    if np.any(ok):
+        idx = np.nonzero(ok)[0]
+        A_ok = A[idx][:, None]
+        B_ok = B[idx][:, None]
+        fa_ok = fa[idx]
+        out_ok = (A_ok + B_ok * fa_ok * fa_ok) * fa_ok
+        out[idx, 1:] = out_ok
+
+    return ok, out

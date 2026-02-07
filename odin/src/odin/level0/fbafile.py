@@ -24,7 +24,8 @@ class FBAfile(Level0File):
     ) -> np.ndarray[tuple[int], np.dtype[np.str_]]:
         w5 = words[..., 5]
         w6 = words[..., 6]
-
+        # print("w5", np.hstack(((w5[0:100] >> np.uint16(13)) & np.uint16(3), w5[0:100] & np.uint16(3))))
+        # print("w6", (w6[0:100] >> np.uint16(13)) & np.uint16(3))
         mirror = np.where(w5 == self.FFFF, w6, w5)
         mirror = np.where(mirror == self.FFFF, np.uint16(0), mirror)
 

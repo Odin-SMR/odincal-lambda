@@ -1,6 +1,6 @@
+from collections.abc import Callable
 from functools import cached_property
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -106,22 +106,30 @@ SHK_VALUES: dict[
     "PRO frequency 549": (21, 3, lambda x: x / 32.0 + 100.0),
     "PRO frequency 572": (29, 1, lambda x: x / 32.0 + 100.0),
     "PRO frequency 555": (29, 3, lambda x: x / 32.0 + 100.0),
-    "LO mechanism A 495": (37, 0, lambda x: x),
-    "LO mechanism A 549": (38, 0, lambda x: x),
-    "LO mechanism A 572": (37, 2, lambda x: x),
-    "LO mechanism A 555": (38, 2, lambda x: x),
-    "LO mechanism B 495": (43, 0, lambda x: x),
-    "LO mechanism B 549": (44, 0, lambda x: x),
-    "LO mechanism B 572": (43, 2, lambda x: x),
-    "LO mechanism B 555": (44, 2, lambda x: x),
-    "SSB mechanism A 495": (35, 0, lambda x: x),
-    "SSB mechanism A 549": (36, 0, lambda x: x),
-    "SSB mechanism A 572": (35, 2, lambda x: x),
-    "SSB mechanism A 555": (36, 2, lambda x: x),
-    "SSB mechanism B 495": (41, 0, lambda x: x),
-    "SSB mechanism B 549": (42, 0, lambda x: x),
-    "SSB mechanism B 572": (41, 2, lambda x: x),
-    "SSB mechanism B 555": (42, 2, lambda x: x),
+    "LO mechanism A 495": (37, 0, lambda x: 310.0 * (-1 + 2 * x / 4095.0)),
+    "LO mechanism A 549": (38, 0, lambda x: 288.0 * (-1 + 2 * x / 4095.0)),
+    "LO mechanism A 572": (37, 2, lambda x: 312.0 * (-1 + 2 * x / 4095.0)),
+    "LO mechanism A 555": (38, 2, lambda x: 310.0 * (-1 + 2 * x / 4095.0)),
+    "LO mechanism B 572": (43, 0, lambda x: 312.0 * (-1 + 2 * x / 4095.0)),
+    "LO mechanism B 555": (44, 0, lambda x: 310.0 * (-1 + 2 * x / 4095.0)),
+    "LO mechanism B 495": (43, 2, lambda x: 310.0 * (-1 + 2 * x / 4095.0)),
+    "LO mechanism B 549": (44, 2, lambda x: 288.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism A 495": (35, 0, lambda x: 313.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism A 495 Ref": (35, 1, lambda x: 313.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism A 549": (36, 0, lambda x: 313.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism A 549 Ref": (36, 1, lambda x: 313.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism A 572": (35, 2, lambda x: 302.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism A 572 Ref": (35, 3, lambda x: 302.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism A 555": (36, 2, lambda x: 308.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism A 555 Ref": (36, 3, lambda x: 308.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism B 495": (41, 2, lambda x: 313.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism B 495 Ref": (41, 3, lambda x: 313.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism B 549": (42, 2, lambda x: 313.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism B 549 Ref": (42, 3, lambda x: 313.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism B 572": (41, 0, lambda x: 302.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism B 572 Ref": (41, 1, lambda x: 302.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism B 555": (42, 0, lambda x: 308.0 * (-1 + 2 * x / 4095.0)),
+    "SSB mechanism B 555 Ref": (42, 1, lambda x: 308.0 * (-1 + 2 * x / 4095.0)),
     "119GHz voltage": (46, 4, lambda x: -56.0 + x * 112.0 / 4095.0),
     "119GHz current": (46, 12, lambda x: -1091.0 + x * 2178.0 / 4095.0),
     # -1 prevously defined as all subids not aplicable in this implementation
@@ -134,6 +142,10 @@ SHK_VALUES: dict[
         lambda x: 944.035 - (0.8374 - (2.567e-4 - 2.74e-8 * x) * x) * x,
     ),
     "ACS availability": (49, 13, lambda x: x),
+    "acdc1 program": (55, 2, lambda x: x),
+    "acdc2 program": (56, 2, lambda x: x),
+    "acdc1 msg": (55, 0, lambda x: x),
+    "acdc2 msg": (56, 0, lambda x: x),
 }
 
 
@@ -167,26 +179,13 @@ class SHKfile(Level0File):
             vals = self.get_values(word=word, subid=subid).astype(np.float32)
             df[name] = func(vals)
         # save sync words without conversion
-        df["ACDC1 sync"] = self.words[:, :, 47].squeeze()
-        df["ACDC2 sync"] = self.words[:, :, 48].squeeze()
-        pro = df.filter(regex="^PRO.*").copy()
-        prof = pro.ffill().bfill()
+        df["ACDC1 Trigger"] = self.words[:, :, 47].squeeze() >> 3 & 0xF
+        df["ACDC2 Trigger"] = self.words[:, :, 48].squeeze() >> 3 & 0xF
+        df["ACDC1 valid"] = self.words[:, :, 47].squeeze() & 0x5
+        df["ACDC2 valid"] = self.words[:, :, 48].squeeze()& 0x5
 
-        df["LO frequency 495"] = (
-            df["HRO frequency 495"] * 17.0 + prof["PRO frequency 495"]
-        ).astype(np.float32) * 6.0e6
-
-        df["LO frequency 549"] = (
-            df["HRO frequency 549"] * 19.0 + prof["PRO frequency 549"]
-        ).astype(np.float32) * 6.0e6
-
-        df["LO frequency 572"] = (
-            df["HRO frequency 572"] * 20.0 + prof["PRO frequency 572"]
-        ).astype(np.float32) * 6.0e6
-        df["LO frequency 555"] = (
-            df["HRO frequency 555"] * 19.0 + prof["PRO frequency 555"]
-        ).astype(np.float32) * 6.0e6
-
+        df["Calibration A"] = (self.words[:, :, 33] >> 13 & 0x3).squeeze()
+        df["Calibration B"] = (self.words[:, :, 39] >> 13 & 0x3).squeeze()
         return df
 
     def to_parquet(self, filename: Path | None = None) -> None:

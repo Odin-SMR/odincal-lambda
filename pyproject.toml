@@ -1,0 +1,108 @@
+[project]
+name = "odin-l1-workflow"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aws-cdk-lib>=2.234.1",
+    "boto3>=1.42.0",
+    "odin",
+]
+
+[dependency-groups]
+cache-tables = ["psycopg2-binary>=2.9.11", "pyyaml>=6.0.3", "requests>=2.32.5"]
+dev = [
+    "awswrangler>=3.15.0",
+    "boto3-stubs[lambda,s3,stepfunctions]>=1.42.0",
+    "future>=1.0.0",
+    "ipykernel<7.0.0",
+    "ipympl>=0.10.0",
+    "matplotlib>=3.10.8",
+    "mockito>=1.5.5",
+    "pandas-stubs>=2.3.3.0",
+    "pyarrow-stubs>=20.0.0.20251215",
+    "pytest>=9.0.2",
+    "ruff>=0.14.11",
+    "ty>=0.0.11",
+    "types-psycopg2>=2.9.21.20251012",
+    "types-pyyaml>=6.0.12.20250915",
+    "types-requests>=2.32.4.20260107",
+]
+greate-zpt = [
+"dask[array,dataframe]>=2025.12.0",
+"nrlmsise00>=0.1.2",
+"pandas>=2.3.3",
+"pyarrow>=22.0.0",
+"pyyaml>=6.0.3",
+"s3fs>2025.10.0",
+"scipy>=1.17.0",
+"xarray>=2025.12.0",
+"zarr>=3.1.5",
+]
+odin-cal = [
+    "attrs>=25.4.0",
+    "boto3>=1.42.0",
+    "numpy>=2.3.5",
+    "odincal",
+    "oops",
+    "pandas>=2.3.3",
+    "psycopg2-binary>=2.9.11",
+    "pygresql>=6.2.2",
+    "pyinotify>=0.9.6",
+    "pyyaml>=6.0.3",
+    "sqlalchemy>=2.0.45",
+]
+
+[tool.uv.workspace]
+members = [
+    ".",                # your main project at the repo root
+    "oops",             # the oops package directory
+    "odincal",
+    "odin",
+]
+
+[tool.uv.sources]
+oops = { workspace = true }
+odincal = { workspace = true }
+odin = { workspace = true, editable = true }
+
+[tool.ty.src]
+exclude = [
+"scripts/redrive_executions.ipynb",
+"odincal/src/odincal/ac_average_datafit_import.py",
+"odincal/src/odincal/ac_average_data_import.py",
+"odincal/src/odincal/import_level0_dir.py",
+"odincal/src/odincal/level0_file_importer.py",
+"odincal/src/odincal/level1b_exporter_32.py",
+"odincal/src/odincal/level1b_exporter_hdf5.py",
+"odincal/src/odincal/level1b_exporter.py",
+"odincal/src/odincal/level1b_exporter_step2_32.py",
+"odincal/src/odincal/level_1b_icalibrate.py",
+"odincal/src/odincal/level1b_importer.py",
+"odincal/src/odincal/level1b_window_importer3.py",
+"odincal/src/odincal/orbit_export.py",
+"odincal/src/odincal/process_level0_or_calibrate.py",
+"odincal/src/odincal/process.py",
+"odincal/src/odincal/reference_fit.py",
+"odincal/scripts/shk.ipynb",
+"odincal/src/odincal/shk_level1_importer.py",
+"oops/oops/aero_1b_logA.py",
+"oops/oops/aero_1b_logB.py",
+"oops/oops/aeronomy.py",
+"oops/oops/aeroorbit.py",
+"oops/oops/atttest.py",
+"oops/oops/autoprocess.py",
+"oops/oops/fba.py",
+"oops/oops/level1a.py",
+"oops/oops/level1b.py",
+"oops/oops/merge_level0.py",
+"oops/oops/odinshow.py",
+"oops/oops/odinview.py",
+"oops/oops/orbit.py",
+"oops/oops/pdcaero.py",
+"oops/oops/process.py",
+"oops/oops/statusmess.py",
+"oops/oops/uvtparse.py",
+"oops/tests/test_default.py",
+]

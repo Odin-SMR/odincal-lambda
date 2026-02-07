@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +10,7 @@ class Level0File:
     sequence_mask: int | None = None
 
     def __init__(self, file: Path):
-        self._created = datetime.now(timezone.utc)
+        self._created = datetime.now(UTC)
         self._file = file
         if self.dtype is None or self.sequence_mask is None:
             raise NotImplementedError("parameters must be defined in subclass")

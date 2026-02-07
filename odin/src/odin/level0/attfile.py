@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +20,7 @@ class AttFile:
 
     def __init__(self, file: Path):
         self._file = file
-        self._created = datetime.now(timezone.utc)
+        self._created = datetime.now(UTC)
 
         with file.open("r") as fh:
             soda_line = fh.readline()

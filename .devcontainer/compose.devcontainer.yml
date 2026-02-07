@@ -53,8 +53,8 @@ services:
       - AWS_DEFAULT_REGION=eu-north-1
       # - LS_LOG=info
       # - DEBUG=0
-    # ports:
-    #   - "4566:4566"
+    ports:
+      - "4566:4566"
     volumes:
       - localstack-data:/var/lib/localstack
       - ./localstack-init:/etc/localstack/init/ready.d
