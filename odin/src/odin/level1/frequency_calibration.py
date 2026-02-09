@@ -15,7 +15,7 @@ class FrequencyCalibrationMixin:
     def frequency_calibration(self: HasFQCalData) -> pd.DataFrame:
         idx = self.specs.index
 
-        vgeo = self.attitude.loc[idx, "vgeo"].to_numpy()[:, None, None]  # (n,1,1)
+        vgeo = self.attitude.loc[idx, "vgeo_tan"].to_numpy()[:, None, None] +100 # (n,1,1)
 
         hk = self.housekeeping.loc[idx]
         frontend = self.ac.loc[idx, "frontend"]

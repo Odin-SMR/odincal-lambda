@@ -69,15 +69,16 @@ class AttFile:
         ).tz_localize("UTC")
         df["stw"] = self._data["stw"]
         df["orbit"] = self._data["orbit"]
-        df["qt"] = self._data["qt"].tolist()
-        df["qa"] = self._data["qa"].tolist()
-        df["qe"] = self._data["qe"].tolist()
-        df["gps"] = self._data["gps"].tolist()
-        df["os_pos"] = self._data["pos_os"].tolist()
-        df["smr_pos"] = self._data["pos_smr"].tolist()
+        df["qt"] = list(rfn.structured_to_unstructured(self._data["qt"]))
+        df["qa"] = list(rfn.structured_to_unstructured(self._data["qa"]))
+        df["qe"] = list(rfn.structured_to_unstructured(self._data["qe"]))
+        df["gps"] = list(rfn.structured_to_unstructured(self._data["gps"]))
+        df["os_pos"] = list(rfn.structured_to_unstructured(self._data["pos_os"]))
+        df["smr_pos"] = list(rfn.structured_to_unstructured(self._data["pos_smr"]))
         df["sci"] = self._data["sci"]
         df["mode"] = self._data["mode"]
-        df["acs"] = self._data["acs"].tolist()
+        df["acs"] = self._data["acs"]
+        print(df.dtypes)
         return df.set_index("stw")
 
     def to_parquet(self, filename: Path | None = None) -> None:
@@ -115,3 +116,4 @@ class AttFile:
             ["stw", "soda"],
             array_cols=["qt", "qa", "qe", "gps"],
         )
+

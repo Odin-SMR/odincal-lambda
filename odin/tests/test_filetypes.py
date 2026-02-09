@@ -1,4 +1,5 @@
-from odin.level0.filetypes import ac1_dt, ac2_dt, shk_dt, os_dt, aos_dt, fba_dt
+from odin.level0.filetypes import ac1_dt, ac2_dt, aos_dt, fba_dt, os_dt, shk_dt
+
 
 def test_block_lengths():
     # According to icd 4.2.4

@@ -94,8 +94,8 @@ class Level1(
         sig = self.spectra["spectra"][signal_mask]
         ref = self.spectra["spectra"][reference_mask]
         hot = self.spectra["spectra"][hotload_mask]
-        print(sig.shape, ref.shape, hot.shape)
-        t_height = self.attitude.smr_pos.loc[signal_mask].str[2].to_numpy()
+        print(sig.shape, ref.shape, hot.shape,signal_mask.shape)
+        t_height = np.stack(self.attitude["smr_pos"].to_numpy())[signal_mask][:,2]
 
         W = 9 # smoothing window size in spectra (must be odd for median)
         # sig_spectrum = np.stack(sig.to_numpy())

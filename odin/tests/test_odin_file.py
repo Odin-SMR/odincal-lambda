@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -14,20 +13,14 @@ from odin.level0.shkfile import SHKfile
     "filename,size,backend",
     [
         ("./odin_cal/data/ac1/1a5/1a5e3ec1.ac1", 7910, 0x7380),
-        # ("./odin_cal/data/ac2/1a5/1a5e3ec1.ac2", 7908, 0x73B0),
+        ("./odin_cal/data/ac2/1a5/1a5e3ec1.ac2", 7908, 0x73B0),
     ],
 )
 def test_ac_file(filename, size, backend):
     with pd.option_context("display.max_columns", None):
         file = Path(filename)
         ac = ACfile(file)
-        df = ac.dataframe()
-        df_old = ac.old()
-        stw = 7078222095
-        row = df.loc[stw]
-        row_old = df_old.loc[stw]
-        print(row["u_cc"][:, :6])
-        print(row_old["u_cc"][:, :6])
+        #ac.to_parquet()
         # assert False
         assert ac.stw.size == size
         assert ac.backend.size == size
@@ -36,7 +29,6 @@ def test_ac_file(filename, size, backend):
         assert (ac.backend == backend).all()
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(
     "filename,size,soda_version",
     [
@@ -55,7 +47,6 @@ def test_fba_file(filename, size, soda_version):
     assert (fba.backend == 0x73EC).all()
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(
     "filename,size,soda_version",
     [
@@ -76,7 +67,6 @@ def test_att_file(filename, size, soda_version):
     assert (att.data["qt"]["q2"] == att.flat[:, 8]).all()
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(
     "filename,size",
     [
