@@ -1,4 +1,12 @@
+import astropy.units as u
 import numpy as np
+from astropy.coordinates import (
+    ITRS,
+    TETE,
+    CartesianDifferential,
+    CartesianRepresentation,
+)
+from astropy.time import Time
 
 # IAU 1976 spheroid per Odin doc (NOT WGS84)
 A = 6378140.0  # m
@@ -7,22 +15,6 @@ e2 = f * (2.0 - f)
 
 OMEGA_EARTH = 7.2921150e-5  # rad/s
 C = 299792458.0
-
-
-def remove_aberration(mb_hat, v, sign=1.0):
-    """
-    mb_hat: (n,3) unit LOS direction (legacy calls this 'mb')
-    v:      (n,3) spacecraft velocity in same frame as mb_hat (m/s)
-    Returns e_hat: aberration-corrected unit vector
-    sign:
-      +1 uses (mb - v/c)/(1 - dv)  (matches your legacy snippet)
-      -1 would apply the opposite correction (if you ever need it)
-    """
-    beta = (sign * v) / C
-    dv = np.einsum("ij,ij->i", mb_hat, beta)  # dot(mb, v/c)
-    e = (mb_hat - beta) / (1.0 - dv)[:, None]
-    e /= np.linalg.norm(e, axis=1, keepdims=True)
-    return e
 
 
 def geodetic_to_ecef_iau76(lat_deg, lon_deg, h_m):
@@ -42,39 +34,6 @@ def geodetic_to_ecef_iau76(lat_deg, lon_deg, h_m):
     return np.column_stack([x, y, z])
 
 
-def compute_vgeo_from_products(sc_state_itrs, smr_tan_llh):
-    """
-    sc_state_itrs: (n,6) [x,y,z,vx,vy,vz] in ITRS/ECEF (m, m/s)
-    smr_tan_llh:   (n,3) [lat_deg, lon_deg, alt_km] for Radiometer LOS
-    """
-    r_sc = sc_state_itrs[:, 0:3]
-    v_sc = sc_state_itrs[:, 3:6]
-
-    lat = smr_tan_llh[:, 0]
-    lon = smr_tan_llh[:, 1]
-    h_m = smr_tan_llh[:, 2] * 1000.0
-
-    r_tan = geodetic_to_ecef_iau76(lat, lon, h_m)
-
-    # LOS unit vector from spacecraft to tangent point (both ITRS)
-    los = r_tan - r_sc
-    los_hat = los / np.linalg.norm(los, axis=1, keepdims=True)
-
-    # Tangent point velocity due to Earth rotation
-    omega = np.array([0.0, 0.0, OMEGA_EARTH])
-    v_tan_rot = np.cross(np.broadcast_to(omega, r_tan.shape), r_tan)
-    v_sc_rot = np.cross(np.broadcast_to(omega, r_sc.shape), r_sc)
-
-    # LOS-projected relative velocity
-    vgeo_tan = np.einsum("ij,ij->i", (v_sc - v_tan_rot), los_hat)
-    vgeo_none = np.einsum("ij,ij->i", v_sc, los_hat)
-    vgeo_sc = np.einsum("ij,ij->i", (v_sc - v_sc_rot), los_hat)
-    return vgeo_tan, vgeo_none, vgeo_sc
-
-
-import numpy as np
-
-
 def vgeo_from_products_with_astropy(sc_state_eci, smr_tan_llh, utc):
     """
     sc_state_eci: (n,6) inertial (ECI-ish / "true equator/equinox of date"): x,y,z,vx,vy,vz [m, m/s] :contentReference[oaicite:0]{index=0}
@@ -87,15 +46,6 @@ def vgeo_from_products_with_astropy(sc_state_eci, smr_tan_llh, utc):
     vgeo_none : -dot(v_sc, los_hat)
     vgeo_sc   : -dot(v_sc - ω×r_sc, los_hat)
     """
-    # --- convert spacecraft inertial -> ITRS using astropy (TETE trick) ---
-    import astropy.units as u
-    from astropy.coordinates import (
-        ITRS,
-        TETE,
-        CartesianDifferential,
-        CartesianRepresentation,
-    )
-    from astropy.time import Time
 
     sc_state_eci = np.asarray(sc_state_eci, dtype=np.float64)
     smr_tan_llh = np.asarray(smr_tan_llh, dtype=np.float64)
@@ -123,7 +73,8 @@ def vgeo_from_products_with_astropy(sc_state_eci, smr_tan_llh, utc):
         ]
     ).T
 
-    # --- tangent point in ITRS/ECEF (use IAU-1976 ellipsoid constants in geodetic_to_ecef_iau76) ---
+    # --- tangent point in ITRS/ECEF (use IAU-1976 ellipsoid constants in
+    # geodetic_to_ecef_iau76) ---
     lat = smr_tan_llh[:, 0]
     lon = smr_tan_llh[:, 1]
     h_m = smr_tan_llh[:, 2] * 1000.0
@@ -138,11 +89,11 @@ def vgeo_from_products_with_astropy(sc_state_eci, smr_tan_llh, utc):
     v_tan_rot = np.cross(np.broadcast_to(omega, r_tan.shape), r_tan)
     v_sc_rot = np.cross(np.broadcast_to(omega, r_sc.shape), r_sc)
 
-    e_hat = remove_aberration(mb_hat, v_sc)
-    # NOTE: Depending on astropy version / interpretation, v_sc in ITRS may already be a time-derivative
+    # NOTE: Depending on astropy version / interpretation, v_sc in ITRS may already be
+    #  a time-derivative
     # in the rotating frame. These three outputs let you empirically match legacy.
-    vgeo_tan = -np.einsum("ij,ij->i", (v_sc + v_tan_rot), e_hat)
-    vgeo_none = -np.einsum("ij,ij->i", v_sc, e_hat)
-    vgeo_sc = -np.einsum("ij,ij->i", (v_sc + v_sc_rot), e_hat)
+    vgeo_tan = -np.einsum("ij,ij->i", (v_sc + v_tan_rot), mb_hat)
+    vgeo_none = -np.einsum("ij,ij->i", v_sc, mb_hat)
+    vgeo_sc = -np.einsum("ij,ij->i", (v_sc + v_sc_rot), mb_hat)
 
     return vgeo_tan, vgeo_none, vgeo_sc

@@ -18,6 +18,7 @@ class HasIntensityCalData(Protocol):
 class intensityCalibrationMixin:
     def intensity_calibration(self: HasIntensityCalData) -> pd.DataFrame:
         sig = np.stack(self.specs["spectra_sig"].to_numpy())
+        print(self.specs["t_height"])
         sig_hi = np.stack(
             self.specs["spectra_sig"][self.specs["t_height"] > 120].to_numpy()
         )

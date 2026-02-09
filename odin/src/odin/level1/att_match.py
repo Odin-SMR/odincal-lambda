@@ -3,9 +3,7 @@ from typing import Protocol
 import numpy as np
 import pandas as pd
 
-from odin.level1.geometry import ecef_to_geodetic_xyz, geodetic_to_ecef_llh
 from odin.level1.odin_geometry import (
-    compute_vgeo_from_products,
     vgeo_from_products_with_astropy,
 )
 
@@ -44,9 +42,7 @@ class AttMatchMixin:
         print(stw_ac.dtype, stw_att.dtype)
 
         sc_itrs = np.stack(self.att["gps"].to_numpy())
-        tangent_point_att = np.stack(self.att["smr_pos"].to_numpy())
 
-        tp_ecef_att = geodetic_to_ecef_llh(tangent_point_att)
         utc_att = self.att["datetime"].astype("int")
         print(utc_att.dtype)
 
@@ -60,39 +56,44 @@ class AttMatchMixin:
                 for i in range(sc_itrs.shape[1])
             ]
         )
-        tp_ecef_ac = np.column_stack(
-            [
-                np.interp(
-                    stw_ac,
-                    stw_att,
-                    tp_ecef_att[:, i],
-                )
-                for i in range(tp_ecef_att.shape[1])
-            ]
-        )
+
+        tp_llh_att = np.stack(self.att["smr_pos"].to_numpy()).astype(
+            float
+        )  # [lat_deg, lon_deg, alt_km?]
+        # Make sure units are correct:
+        # If ACS gives alt in km (STW.ATT does), convert to meters for interpolation if you want meters
+        tp_lat = tp_llh_att[:, 0]
+        tp_lon = tp_llh_att[:, 1]
+        tp_h_km = tp_llh_att[:, 2]
+
+        # unwrap lon in radians to avoid 359->1 discontinuity
+        lon_rad = np.deg2rad(tp_lon)
+        lon_rad_unwrap = np.unwrap(lon_rad)
+        tp_lon_unwrap = np.rad2deg(lon_rad_unwrap)
+
+        lat_ac = np.interp(stw_ac, stw_att, tp_lat)
+        lon_ac = np.interp(stw_ac, stw_att, tp_lon_unwrap)
+        h_ac_km = np.interp(stw_ac, stw_att, tp_h_km)
+
+        # wrap lon back if you want
+        lon_ac = (lon_ac + 360.0) % 360.0
+
+        tp_llh_ac = np.column_stack([lat_ac, lon_ac, h_ac_km])
+
         utc_ac = np.interp(stw_ac, stw_att, utc_att).astype("datetime64[ms]")
-        tp_geodetic_ac = ecef_to_geodetic_xyz(tp_ecef_ac)
 
         df = pd.DataFrame()
         df["stw"] = stw_ac + 14
         df["datetime"] = utc_ac = pd.to_datetime(utc_ac, utc=True)
         df["jd"] = datetime64ms_to_jd(df["datetime"])
 
-        df["smr_height"] = tp_ecef_ac[:, 2]
+        df["smr_height"] = tp_llh_ac[:, 2]
         df["sc"] = list(sc_itrs_ac)
-        df["smr_pos"] = list(tp_geodetic_ac)
-        # df["vgeo"],df["vgeo_rel_air"] = vgeo_from_att_variants(
-        #     df["datetime"],  # add small offset to avoid interpolation issues at boundaries
-        #     sc_itrs_ac[:, 0:3],
-        #     sc_itrs_ac[:, 3:6],
-        #     tp_geodetic_ac,
-        # )
-        df["vgeo_tan"],df["vgeo_none"], df["vgeo_sc"] = vgeo_from_products_with_astropy(
-            sc_itrs_ac.astype(float), tp_geodetic_ac.astype(float), utc_ac
+        df["smr_pos"] = list(tp_llh_ac)
+        df["vgeo_tan"], df["vgeo_none"], df["vgeo_sc"] = (
+            vgeo_from_products_with_astropy(
+                sc_itrs_ac.astype(float), tp_llh_ac.astype(float), utc_ac
+            )
         )
-        # df["vgeo_tan"],df["vgeo_none"], df["vgeo_sc"] = compute_vgeo_from_products(
-        #     sc_itrs_ac, tp_geodetic_ac
-        # )
 
-        print(df.loc[7077176154:7077178969].filter(regex="vgeo"))
         return df.set_index("stw")
