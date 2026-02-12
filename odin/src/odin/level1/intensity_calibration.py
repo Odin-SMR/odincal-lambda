@@ -15,54 +15,70 @@ class HasIntensityCalData(Protocol):
     frequency_grid: pd.DataFrame
 
 
-class intensityCalibrationMixin:
+class IntensityCalibrationMixin:
     def intensity_calibration(self: HasIntensityCalData) -> pd.DataFrame:
-        sig = np.stack(self.specs["spectra_sig"].to_numpy())
+        S = np.stack(self.specs["spectra_sig"].to_numpy())
         print(self.specs["t_height"])
-        sig_hi = np.stack(
+        S_hi = np.stack(
             self.specs["spectra_sig"][self.specs["t_height"] > 120].to_numpy()
         )
-        ref_hi = np.stack(
+        C_hi = np.stack(
             self.specs["spectra_ref"][self.specs["t_height"] > 120].to_numpy()
         )
-        ref = np.stack(self.specs["spectra_ref"].to_numpy())
-        hot = np.stack(self.specs["hot"].to_numpy())
-        hot_hi = np.stack(self.specs["hot"][self.specs["t_height"] > 120].to_numpy())
+        C = np.stack(self.specs["spectra_ref"].to_numpy())
+        H = np.stack(self.specs["hot"].to_numpy())
+        H_hi = np.stack(self.specs["hot"][self.specs["t_height"] > 120].to_numpy())
         hot_temp = (
             self.housekeeping.loc[self.specs.index]["image load B-side"].to_numpy()[
                 :, None, None
             ]
             + 273.15
-            - 1.1
         )
         fq_grid = np.stack(
             self.frequency_grid["frequency_grid"]
             .loc[self.specs["spectra_sig"].index]
             .to_numpy()
         ).astype(np.float64)
-        print(fq_grid.shape, fq_grid.dtype)
 
         Tbg = J(2.7, fq_grid)
         Thot = J(hot_temp, fq_grid)
         eta = 1
 
-        hot_ref_span_hi = hot_hi - ref_hi
-        span = np.percentile(hot_ref_span_hi, 10, axis=0)
-        W = np.nanmedian(span, axis=-1, keepdims=True) / span
-        W = W / np.nanmedian(W, axis=-1, keepdims=True)
+        diff = S - C
+        span = H - C
+        span_hi = H_hi - C_hi
 
-        diff_eq = (sig - ref) * W
-        diff_eq_hi = (sig_hi - ref_hi) * W
-        span_eq = (hot - ref) * W
+        p20 = np.nanpercentile(span_hi, 20, axis=0)
+        span_hi_med = np.nanmedian(span_hi, axis=0)
+        mask = (span_hi > p20) & (span_hi > 0.7 * span_hi_med)
+        pe_hi = np.where(mask, (S_hi - C_hi) / span_hi, np.nan)
+        PE = np.nanmedian(pe_hi, axis=0)
+        PE = PE - np.nanmedian(PE, axis=-1, keepdims=True)
 
-        offset_counts = np.percentile(diff_eq_hi, 50, axis=0)  # or 10 if you like
-        diff_eq0 = diff_eq - offset_counts
+        diff_debiased = diff - PE[None, :, :] * (span)
 
-        cal = (Tbg + (diff_eq0) * (Thot - Tbg) / (span_eq)) / eta
+
+        cal_J = Tbg + diff_debiased * (Thot - Tbg) / span
+        cal_T = J_inv(cal_J, fq_grid)
+
+        hi = self.specs["t_height"].to_numpy() > 120
+
+        Tamb = J(300.0, fq_grid)
+
+        ratio = (cal_J[hi] - Tbg[hi]) / (Tamb[hi] - Tbg[hi])
+        one_minus_eta_band = np.clip(np.nanmedian(ratio, axis=(0, 2)), 0.0, 0.3)
+        eta_band = 1.0 - one_minus_eta_band
+
+        eta = eta_band[None, :, None]
+        cal_J_corr = (cal_J - (1.0 - eta) * Tamb) / eta
+        cal_T_corr = J_inv(cal_J_corr, fq_grid)
 
         df = pd.DataFrame(index=self.specs.index)
-        cal_T = J_inv(cal, fq_grid)
-        df["calibrated"] = list(cal)
+        df["calibrated"] = list(cal_J_corr)
+        # df["path_error"] = list(path_error)
+        df["span"] = list(span)
+        df["calibrated_T"] = list(cal_T_corr)
+
         return df
 
 

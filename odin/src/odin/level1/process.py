@@ -7,7 +7,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 from odin.level1.att_match import AttMatchMixin
 from odin.level1.fba_match import FilterBufferMixin
 from odin.level1.frequency_calibration import FrequencyCalibrationMixin
-from odin.level1.intensity_calibration import intensityCalibrationMixin
+from odin.level1.intensity_calibration import IntensityCalibrationMixin
 from odin.level1.reduce import ReducerMixin
 from odin.level1.shk_match import HouseKeepingMixin
 
@@ -18,7 +18,7 @@ class Level1(
     HouseKeepingMixin,
     FilterBufferMixin,
     FrequencyCalibrationMixin,
-    intensityCalibrationMixin,
+    IntensityCalibrationMixin,
 ):
     def __init__(
         self,
@@ -123,3 +123,55 @@ class Level1(
         )
         self.specs["hot"] = hot_series
         self.specs["t_height"] = t_height
+        self.specs["span"] = build_span_for_sig(sig, ref, hot)
+
+def build_span_for_sig(sig: pd.Series, ref: pd.Series, hot: pd.Series, tol=64*4):
+    """
+    Returns a pd.Series span_for_sig with index = sig.index and each value shape (8,112)
+    span is derived at hot times: span_hot = hot - ref_near_hot, then interpolated to sig times.
+    """
+
+    # hot events dataframe
+    hot_df = hot.reset_index().rename(columns={"spectra": "hot"})
+    ref_df = ref.reset_index().rename(columns={"spectra": "ref"})
+
+    # pair each HOT with nearest REF (cold) around that hot time
+    hot_ref = pd.merge_asof(
+        hot_df.sort_values("stw"),
+        ref_df.sort_values("stw"),
+        on="stw",
+        direction="nearest",
+        tolerance=tol,
+    )
+
+    # drop hot events that failed to find a ref
+    hot_ref = hot_ref.dropna(subset=["ref"])
+
+    # compute span at hot times (arrays)
+    span_hot = np.stack(hot_ref["hot"].to_numpy()) - np.stack(hot_ref["ref"].to_numpy())
+    stw_hot = hot_ref["stw"].to_numpy().astype(np.float64)
+
+    # interpolate span_hot onto sig times (linear in time)
+    stw_sig = sig.index.to_numpy().astype(np.float64)
+    order = np.argsort(stw_hot)
+    stw_hot = stw_hot[order]
+    span_hot = span_hot[order]
+
+    # For each sig time, find bracketing hot indices
+    j = np.searchsorted(stw_hot, stw_sig, side="left")
+    j0 = np.clip(j - 1, 0, len(stw_hot) - 1)
+    j1 = np.clip(j,     0, len(stw_hot) - 1)
+
+    t0 = stw_hot[j0]
+    t1 = stw_hot[j1]
+    s0 = span_hot[j0]
+    s1 = span_hot[j1]
+
+    # avoid divide-by-zero when t0==t1 (edges / duplicate hot times)
+    alpha = np.zeros_like(stw_sig, dtype=np.float64)
+    ok = t1 > t0
+    alpha[ok] = (stw_sig[ok] - t0[ok]) / (t1[ok] - t0[ok])
+
+    span_sig = (1 - alpha)[:, None, None] * s0 + alpha[:, None, None] * s1
+
+    return pd.Series(list(span_sig), index=sig.index, name="span")

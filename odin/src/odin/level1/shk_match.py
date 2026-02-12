@@ -32,7 +32,7 @@ class HouseKeepingMixin:
         )
         temp_source_lock = "image load B-side"  # TODO: fix based on frontend
         temp = df[temp_source_lock]
-        temp_source_warm = "warm IF A-side"
+        temp_source_warm = "warm IF B-side"
         temp_warm = df[temp_source_warm]
         print(temp.mean(), temp.min(), temp.max())
         df["LO frequency 495"] = (
@@ -50,13 +50,13 @@ class HouseKeepingMixin:
         ) * 6.0e6
 
         df["LO frequency 555"] = (
-            FECB_drift(temp)
-            * (df["HRO frequency 555"] * 19.0 + df["PRO frequency 555"])
+            #FECB_drift(temp)
+            1 * (df["HRO frequency 555"] * 19.0 + df["PRO frequency 555"])
         ) * 6.0e6
         df["ssb_fq"] = np.where(
             self.ac["backend"].to_numpy() == "AC1",
             self.ac["ssb_fq"] * (1 + (50.03 - 0.974 * temp_warm.to_numpy()) * 1e-6),
-            self.ac["ssb_fq"] * (1 + (50.63 - 0.920 * temp_warm.to_numpy()) * 1e-6)
+            self.ac["ssb_fq"] * (1 + (50.63 - 0.920 * temp_warm.to_numpy()) * 1e-6),
         )
         df["adjusted_clock"] = np.where(
             self.ac["backend"].to_numpy() == "AC1",

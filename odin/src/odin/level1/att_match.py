@@ -24,8 +24,8 @@ FIELDS = [
 ]
 
 
-def datetime64ms_to_jd(s: pd.Series) -> pd.Series:
-    return (s - JD_EPOCH) / pd.Timedelta(days=1) + 2_400_000.5
+def datetime64ms_to_mjd(s: pd.Series) -> pd.Series:
+    return (s - JD_EPOCH) / pd.Timedelta(days=1) #+ 2_400_000.5
 
 
 class HasACData(Protocol):
@@ -37,7 +37,7 @@ class AttMatchMixin:
     def att_match(self: HasACData) -> pd.DataFrame:
         """Match attitude data to AC data based on STW."""
         # do some interpolation / nearest-neighbor matching
-        stw_ac = self.ac.index.to_numpy() - 14
+        stw_ac = self.ac.index.to_numpy()  # - 14
         stw_att = self.att.index.to_numpy()
         print(stw_ac.dtype, stw_att.dtype)
 
@@ -83,9 +83,9 @@ class AttMatchMixin:
         utc_ac = np.interp(stw_ac, stw_att, utc_att).astype("datetime64[ms]")
 
         df = pd.DataFrame()
-        df["stw"] = stw_ac + 14
+        df["stw"] = stw_ac  # + 14
         df["datetime"] = utc_ac = pd.to_datetime(utc_ac, utc=True)
-        df["jd"] = datetime64ms_to_jd(df["datetime"])
+        df["mjd"] = datetime64ms_to_mjd(df["datetime"])
 
         df["smr_height"] = tp_llh_ac[:, 2]
         df["sc"] = list(sc_itrs_ac)
